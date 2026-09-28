@@ -20,7 +20,10 @@ end)
 
 RegisterNUICallback('request', function(data, cb)
     if type(data) ~= 'table' or type(data.action) ~= 'string' or type(data.payload) ~= 'table'
-        or (data.action ~= 'listBusinesses' and data.action ~= 'createBusiness') then
+        or (data.action ~= 'listBusinesses' and data.action ~= 'createBusiness'
+            and data.action ~= 'listRecipes' and data.action ~= 'createRecipe'
+            and data.action ~= 'listSuppliers' and data.action ~= 'createSupplier'
+            and data.action ~= 'quoteRecipe') then
         cb({ ok = false, error = 'invalid_payload' }); return
     end
     for key in pairs(data) do
