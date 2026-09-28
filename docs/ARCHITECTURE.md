@@ -1,8 +1,8 @@
-# Architecture and trust boundaries (v0.1.0-dev)
+# Architecture and trust boundaries (v0.4.0-dev)
 
 ## Current implementation
 
-`fxmanifest.lua` loads oxmysql, ox_lib, shared configuration, framework selection, a server schema gate and a Lua client NUI bridge. The development `/foodbusiness_ui` command opens the React shell. The `close` and `request` callbacks check payloads; only `listBusinesses` and `createBusiness` are accepted. The latter derives character identity on the server, checks ACE permission and writes a business and audit row in one local transaction. `sql/001_initial.sql` is imported manually. Startup refuses business requests if the schema check fails. These source paths have not been live verified.
+`fxmanifest.lua` loads oxmysql, ox_lib, shared configuration, framework selection, a server schema gate and a Lua client NUI bridge. The development `/foodbusiness_ui` command opens the React shell. The `close` and `request` callbacks check payloads; the allowlist covers business, recipe and supplier catalog actions plus a read-only recipe price quote. The latter derives character identity on the server, checks ACE permission and writes a business and audit row in one local transaction. `sql/001_initial.sql` and `sql/002_catalogs.sql` are imported manually. Startup refuses business requests if the schema check fails. These source paths have not been live verified.
 
 ## Service ownership
 
@@ -23,7 +23,7 @@ Current request flow: NUI form → validated client callback → server action w
 
 ## Threat model and decisions
 
-Untrusted NUI/client input, forged business IDs, replayed payment requests, duplicate fulfilment, stale roles, malformed prices and settlement failures are risks. All sensitive decisions belong on the server, with player identity derived from `source`, correlations and constrained transitions. The current first business mutation is ACE-gated and audited. It has not passed adversarial testing. Future payment mutations need durable idempotency and reconciliation before being enabled.
+Untrusted NUI/client input, forged business IDs, replayed payment requests, duplicate fulfilment, stale roles, malformed prices and settlement failures are risks. All sensitive decisions belong on the server, with player identity derived from `source`, correlations and constrained transitions. Business creation is ACE-gated. Recipe and supplier creation require verified business ownership and are audited in local SQL transactions. It has not passed adversarial testing. Future payment mutations need durable idempotency and reconciliation before being enabled.
 
 **ADR 0001:** Select one primary framework; test each independently.
 
