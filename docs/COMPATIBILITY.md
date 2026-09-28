@@ -9,7 +9,7 @@ As of 2026-09-28, this repository contains development source and a locally pass
 | ESX identity adapter | Yes | No | v0.1 target; independently test |
 | QBCore identity adapter | Yes | No | v0.1 target; independently test |
 | QBox identity adapter | Yes | No | v0.1 target; independently test |
-| oxmysql/manual schema gate | Yes | No | Apply SQL; migration upgrades not implemented |
+| oxmysql/manual schema gate | Yes | No | Apply both SQL scripts; automated migration upgrades not implemented |
 | ox_lib dependency | Declared | No | UI helpers not yet used |
 | Inventory / target | No | No | Planned optional adapters |
 | Standalone banking / billing | No | No | Planned separately |
