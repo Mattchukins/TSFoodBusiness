@@ -5,12 +5,17 @@
 - [x] Resource manifest, Lua client/server/shared layout and version string committed.
 - [x] React/TypeScript source, build script and static check committed.
 - [x] Source-inspected sibling UI inventory, architecture, threat model, feature matrix and compatibility record committed.
-- [x] `npm install --no-audit --no-fund && npm run check && npm run build` passed locally on 2026-09-28 (TypeScript and Vite).
+- [x] `npm install && npm run check && npm run build` passed locally on 2026-09-28.
 - [ ] Empty resource startup, open/close and focus release tested in FiveM.
 - [ ] Built NUI assets packaged for installation.
 
-Directories for future services (`bridges/`, `modules/`, `sql/`, `tests/`) are created with their first implementation in their respective milestone; empty folders cannot be represented in Git. Do not label v0.0.0 verified until all above gates pass.
+## v0.1.0 development checkpoint
 
-## Each subsequent release
+- [x] Single framework detection and server-derived identity code added.
+- [x] Schema gate refuses absent or wrong schema; manual version 1 SQL supplied.
+- [x] NUI requests limited to explicit actions with server-side checks.
+- [ ] ESX, QBCore and QBox separately smoke tested in FiveM.
+- [ ] Migration runner, internal business ledger and complete v0.1 contracts.
+- [ ] Security, restart and transaction rollback tested against MySQL.
 
-Record Lua/static/NUI checks, migration upgrade/failure/restart evidence, security and idempotency tests, framework-specific in-server results, configured provider versions, regression/performance results and changelog entries. Never claim compatibility from source review alone.
+See [phase progress](PHASE_PROGRESS.md) for v0.2–v0.7. Do not label any phase verified before its roadmap exit criteria pass.
