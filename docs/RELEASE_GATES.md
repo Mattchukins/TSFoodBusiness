@@ -5,7 +5,7 @@
 - [x] Resource manifest, Lua client/server/shared layout and version string committed.
 - [x] React/TypeScript source, build script and static check committed.
 - [x] Source-inspected sibling UI inventory, architecture, threat model, feature matrix and compatibility record committed.
-- [ ] `npm install && npm run check && npm run build` run and passing.
+- [x] `npm install --no-audit --no-fund && npm run check && npm run build` passed locally on 2026-09-28 (TypeScript and Vite).
 - [ ] Empty resource startup, open/close and focus release tested in FiveM.
 - [ ] Built NUI assets packaged for installation.
 
