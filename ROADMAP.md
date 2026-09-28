@@ -3,7 +3,7 @@
 **Resource:** `ts-foodbusiness`  
 **Versions:** `0.0.0` through `1.5.0`  
 **Branch:** `main` only.  
-**Status:** Specification and development targets, not implemented or verified functionality.
+**Status:** Development targets; see [phase progress](docs/PHASE_PROGRESS.md) for current implementation and verification. No milestone exit has been verified.
 
 ## Product scope and source references
 
