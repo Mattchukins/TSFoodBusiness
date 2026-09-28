@@ -1,18 +1,18 @@
 # Compatibility and verification status
 
-As of 2026-09-28, this repository contains only the v0.0.0 bootstrap. No live FiveM server result is recorded.
+As of 2026-09-28, this repository contains development source and a locally passing TypeScript/Vite build. No live FiveM server result is recorded.
 
-| Component | Implemented | Live verified | Status |
+| Component | Code present | Live verified | Status |
 | --- | --- | --- | --- |
-| FiveM resource manifest and Lua lifecycle | Yes | No | Build NUI then test in server |
-| React/TypeScript NUI close bridge | Yes | No | Build and in-game smoke test pending |
-| ESX | No | No | v0.1 target |
-| QBCore | No | No | v0.1 target |
-| QBox | No | No | v0.1 target |
-| oxmysql / migrations | No | No | v0.1 target |
-| ox_lib | No | No | v0.1 target |
+| FiveM resource manifest and Lua lifecycle | Yes | No | Requires build assets and server smoke test |
+| React/TypeScript NUI close/request bridge | Yes | No | Browser build passed, FiveM interaction pending |
+| ESX identity adapter | Yes | No | v0.1 target; independently test |
+| QBCore identity adapter | Yes | No | v0.1 target; independently test |
+| QBox identity adapter | Yes | No | v0.1 target; independently test |
+| oxmysql/manual schema gate | Yes | No | Apply SQL; migration upgrades not implemented |
+| ox_lib dependency | Declared | No | UI helpers not yet used |
 | Inventory / target | No | No | Planned optional adapters |
 | Standalone banking / billing | No | No | Planned separately |
 | External banking / billing | No | No | Candidate APIs require inspection and live testing |
 
-No compatibility claim should be published from this table until a dated in-server test names exact framework, provider versions, configured options, pass/fail evidence and restart outcome.
+No compatibility claim should be published until a dated in-server test names framework and provider versions, configured options, pass/fail evidence and restart outcome.
