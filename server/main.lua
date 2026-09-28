@@ -3,6 +3,16 @@ local allowedTypes = { restaurant = true, cafe = true, bakery = true, bar = true
 local function validText(value, max)
     return type(value) == 'string' and #value >= 2 and #value <= max and not value:find('[%c]')
 end
+local function validId(value)
+    return type(value) == 'string' and value:match('^[a-fA-F0-9%-]+$') and #value == 36
+end
+local function validPrice(value)
+    return type(value) == 'number' and value == math.floor(value) and value >= 1 and value <= 10000000
+end
+local function exactKeys(data, keys)
+    for key in pairs(data) do if not keys[key] then return false end end
+    return true
+end
 local function respond(source, requestId, result)
     TriggerClientEvent('tsfb:response', source, { requestId = requestId, result = result })
 end
@@ -14,7 +24,7 @@ CreateThread(function()
         return MySQL.scalar.await('SELECT MAX(version) FROM tsfb_schema')
     end)
     if not success or tonumber(version) ~= FoodBusiness.RequiredSchema then
-        print('[ts-foodbusiness] disabled: apply sql/001_initial.sql; expected schema ' .. FoodBusiness.RequiredSchema)
+        print('[ts-foodbusiness] disabled: apply sql/001_initial.sql then sql/002_catalogs.sql; expected schema ' .. FoodBusiness.RequiredSchema)
         return
     end
     ready = true
@@ -68,6 +78,88 @@ RegisterNetEvent('tsfb:request', function(request)
         local ok, done = pcall(function() return MySQL.transaction.await(statements) end)
         respond(src, request.requestId, ok and done and { ok = true, id = id } or { ok = false, error = 'transaction_failed' })
         return
+    end
+    if (request.action == 'listRecipes' or request.action == 'createRecipe'
+        or request.action == 'quoteRecipe' or request.action == 'listSuppliers'
+        or request.action == 'createSupplier') and validId(request.data.businessId) then
+        local data = request.data
+        local business = MySQL.single.await('SELECT id FROM tsfb_businesses WHERE id = ? AND owner_id = ?',
+            { data.businessId, person.id })
+        if not business then respond(src, request.requestId, { ok = false, error = 'forbidden' }); return end
+        if request.action == 'listRecipes' and FoodBusiness.Modules.recipes then
+            if not exactKeys(data, { businessId = true }) then
+                respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+            end
+            local rows = MySQL.query.await('SELECT id, name, price_cents, ingredients FROM tsfb_recipes WHERE business_id = ? ORDER BY name LIMIT 200', { data.businessId })
+            respond(src, request.requestId, { ok = true, recipes = rows }); return
+        end
+        if request.action == 'quoteRecipe' and FoodBusiness.Modules.recipes then
+            if not validId(data.recipeId) or not exactKeys(data, { businessId = true, recipeId = true }) then
+                respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+            end
+            local recipe = MySQL.single.await('SELECT id, name, price_cents FROM tsfb_recipes WHERE id = ? AND business_id = ?', { data.recipeId, data.businessId })
+            respond(src, request.requestId, recipe and { ok = true, quote = recipe } or { ok = false, error = 'not_found' })
+            return
+        end
+        if request.action == 'listSuppliers' and FoodBusiness.Modules.suppliers then
+            if not exactKeys(data, { businessId = true }) then
+                respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+            end
+            local rows = MySQL.query.await('SELECT id, name, item_name, unit_price_cents FROM tsfb_suppliers WHERE business_id = ? ORDER BY name LIMIT 200', { data.businessId })
+            respond(src, request.requestId, { ok = true, suppliers = rows }); return
+        end
+        if request.action == 'createRecipe' and FoodBusiness.Modules.recipes then
+            if not validText(data.name, 80) or not validPrice(data.priceCents)
+                or type(data.ingredients) ~= 'table' or #data.ingredients < 1 or #data.ingredients > 16
+                or not exactKeys(data, { businessId = true, name = true, priceCents = true, ingredients = true }) then
+                respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+            end
+            local ingredientCount = 0
+            for key in pairs(data.ingredients) do
+                if type(key) ~= 'number' or key ~= math.floor(key) or key < 1 or key > #data.ingredients then
+                    respond(src, request.requestId, { ok = false, error = 'invalid_ingredient' }); return
+                end
+                ingredientCount = ingredientCount + 1
+            end
+            if ingredientCount ~= #data.ingredients then
+                respond(src, request.requestId, { ok = false, error = 'invalid_ingredient' }); return
+            end
+            for _, ingredient in ipairs(data.ingredients) do
+                if type(ingredient) ~= 'table' or not exactKeys(ingredient, { item = true, quantity = true })
+                    or not validText(ingredient.item, 64) or type(ingredient.quantity) ~= 'number'
+                    or ingredient.quantity ~= math.floor(ingredient.quantity) or ingredient.quantity < 1
+                    or ingredient.quantity > 1000 then
+                    respond(src, request.requestId, { ok = false, error = 'invalid_ingredient' }); return
+                end
+            end
+            local id = MySQL.scalar.await('SELECT UUID()')
+            local ok, done = pcall(function() return MySQL.transaction.await({
+                { query = 'INSERT INTO tsfb_recipes (id, business_id, name, price_cents, ingredients) VALUES (?, ?, ?, ?, ?)',
+                    values = { id, data.businessId, data.name, data.priceCents, json.encode(data.ingredients) } },
+                { query = 'INSERT INTO tsfb_audit (action, actor_id, business_id, correlation_id, details) VALUES (?, ?, ?, ?, ?)',
+                    values = { 'recipe.create', person.id, data.businessId, person.id .. ':' .. request.requestId,
+                        json.encode({ id = id, name = data.name, priceCents = data.priceCents }) } },
+            }) end)
+            respond(src, request.requestId, ok and done and { ok = true, id = id } or { ok = false, error = 'transaction_failed' })
+            return
+        end
+        if request.action == 'createSupplier' and FoodBusiness.Modules.suppliers then
+            if not validText(data.name, 80) or not validText(data.itemName, 80)
+                or not validPrice(data.unitPriceCents)
+                or not exactKeys(data, { businessId = true, name = true, itemName = true, unitPriceCents = true }) then
+                respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+            end
+            local id = MySQL.scalar.await('SELECT UUID()')
+            local ok, done = pcall(function() return MySQL.transaction.await({
+                { query = 'INSERT INTO tsfb_suppliers (id, business_id, name, item_name, unit_price_cents) VALUES (?, ?, ?, ?, ?)',
+                    values = { id, data.businessId, data.name, data.itemName, data.unitPriceCents } },
+                { query = 'INSERT INTO tsfb_audit (action, actor_id, business_id, correlation_id, details) VALUES (?, ?, ?, ?, ?)',
+                    values = { 'supplier.create', person.id, data.businessId, person.id .. ':' .. request.requestId,
+                        json.encode({ id = id, name = data.name, itemName = data.itemName, unitPriceCents = data.unitPriceCents }) } },
+            }) end)
+            respond(src, request.requestId, ok and done and { ok = true, id = id } or { ok = false, error = 'transaction_failed' })
+            return
+        end
     end
     respond(src, request.requestId, { ok = false, error = 'unknown_action' })
 end)
