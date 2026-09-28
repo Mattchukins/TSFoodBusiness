@@ -1,38 +1,32 @@
-# Architecture and trust boundaries (v0.0.0)
+# Architecture and trust boundaries (v0.1.0-dev)
 
 ## Current implementation
 
-`fxmanifest.lua` loads shared configuration, a server lifecycle logger, a client NUI lifecycle bridge and a React/TypeScript shell. The temporary `/foodbusiness_ui` command opens it; the `close` NUI callback checks for an empty object and releases focus. No server network events, persistence, inventory or finance operations exist yet. Build `web/dist` before starting the resource.
+`fxmanifest.lua` loads oxmysql, ox_lib, shared configuration, framework selection, a server schema gate and a Lua client NUI bridge. The development `/foodbusiness_ui` command opens the React shell. The `close` and `request` callbacks check payloads; only `listBusinesses` and `createBusiness` are accepted. The latter derives character identity on the server, checks ACE permission and writes a business and audit row in one local transaction. `sql/001_initial.sql` is imported manually. Startup refuses business requests if the schema check fails. These source paths have not been live verified.
 
-## Planned service ownership
+## Service ownership
 
 | Layer | Responsibility | Trust |
 | --- | --- | --- |
 | React NUI | Render state, collect inputs, send named callbacks | Untrusted |
-| Lua client | Focus, local presentation and callback forwarding | Untrusted for identity or money |
-| Lua server | Resolve source/character, authorize operations, calculate prices, consume stock, audit | Authority |
-| Framework bridge | One primary ESX/QBCore/QBox implementation selected at startup | Server-side |
-| Database service | Versioned migrations, parameterized queries and transactional mutations plus audit | Server-side |
-| Provider bridges | Independent inventory, target, banking and billing capabilities | Explicitly configured |
+| Lua client | Focus, request correlation and timeout | Untrusted for identity or money |
+| Lua server | Resolve identity, authorize and validate operations, audit | Authority |
+| Framework bridge | One primary ESX/QBCore/QBox adapter selected at startup | Server-side |
+| Database | Versioned schema, parameterized queries and transactional mutations plus audit | Server-side |
+| Future provider bridges | Independent inventory, target, banking and billing capabilities | Explicitly configured |
 
-Planned flow: NUI action → validated client callback → server event with request correlation ID → resolve identity and permissions on server → transaction for local state and audit → explicit result to client → update NUI. External settlement requires durable state transitions, idempotency and reconciliation; a local SQL transaction cannot atomically commit an external provider call.
+Current request flow: NUI form → validated client callback → server action with correlation ID → server-derived identity and permission → SQL transaction plus audit → response to NUI. External settlement and inventory are not implemented. A local SQL transaction cannot atomically commit an external provider call.
 
-## Dependency graph and startup
+## Dependency and failure behavior
 
-`web/dist` is a build artifact. Bootstrap has no ox dependency. At v0.1, oxmysql and ox_lib must be declared and checked before starting database-backed modules; framework selection must reject zero or ambiguous primary frameworks while treating QBox qb-core compatibility as part of QBox. Optional providers must fail only their dependent module. A failed migration blocks database-backed modules.
+`web/dist` must be built for installation. `oxmysql` and `ox_lib` are declared hard dependencies. Framework detection rejects zero or multiple primary frameworks; QBox's qb-core compatibility does not count separately. Missing/incorrect schema disables database actions. Optional providers do not exist yet.
 
-## Threat model
+## Threat model and decisions
 
-Untrusted NUI messages, client events, forged business IDs, replayed payment requests, duplicate fulfilment, stale role permissions, malformed prices and external settlement failures are the main risks. All sensitive decisions belong on the server; reject unknown callbacks and payload fields, derive player identity from `source`, use correlation IDs and constrained state transitions, and record audit within the same local transaction as its mutation. These are design requirements, not implemented controls.
+Untrusted NUI/client input, forged business IDs, replayed payment requests, duplicate fulfilment, stale roles, malformed prices and settlement failures are risks. All sensitive decisions belong on the server, with player identity derived from `source`, correlations and constrained transitions. The current first business mutation is ACE-gated and audited. It has not passed adversarial testing. Future payment mutations need durable idempotency and reconciliation before being enabled.
 
-## ADR 0001: Single primary framework
+**ADR 0001:** Select one primary framework; test each independently.
 
-Choose exactly one primary framework at startup. QBox compatibility exports do not imply an additional QBCore instance. Separate live smoke tests are required before advertising support.
+**ADR 0002:** Banking and billing remain independently selected. Native money and internal ledger will support standalone operation.
 
-## ADR 0002: Separate financial adapters
-
-Native player money and an internal persisted business ledger support standalone operation. Banking and billing integrations select independently; provider capability gaps remain visible rather than silently simulated.
-
-## ADR 0003: Source-aligned NUI shell
-
-Use React/TypeScript and NUI callbacks through Lua. Follow the inspected sibling design routes documented in [NUI_DESIGN.md](NUI_DESIGN.md). Keep screen navigation separate from server permissions.
+**ADR 0003:** Use React/TypeScript and Lua NUI callbacks, following observed sibling design conventions recorded in [NUI_DESIGN.md](NUI_DESIGN.md).
