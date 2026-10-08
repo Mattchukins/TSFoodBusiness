@@ -16,7 +16,7 @@ local timer = 0
 GetGameTimer = function() return timer end
 MySQL = {
     single = { await = function(query, values)
-        if query:find('tsfb_schema', 1, true) then return { count = 6, minimum = 1, maximum = 6 } end
+        if query:find('tsfb_schema', 1, true) then return { count = 7, minimum = 1, maximum = 7 } end
         if query:find('owner_id', 1, true) then assert(values[1] == id and values[2] == 'owner-42'); return { id = id } end
     end },
     query = { await = function(query)
@@ -32,6 +32,12 @@ CookingJobs = {
     start = function(src, actor, data) assert(src == 42 and actor == 'owner-42' and data.businessId == id); calls = calls + 1; return { ok = false, error = 'cooking_disabled' } end,
     act = function(src, actor, data, action) assert(src == 42 and actor == 'owner-42' and data.jobId == id); calls = calls + 1; return { ok = true, action = action } end,
 }
+local staffCalls = 0
+Staff = { handle = function(src, actor, action, data)
+    assert(src == 42 and actor == 'owner-42')
+    staffCalls = staffCalls + 1
+    return { ok = true, action = action }
+end }
 dofile('server/main.lua')
 source = 42
 local function send(action, data)
@@ -57,4 +63,8 @@ assert(response.error == 'identity_unavailable' and calls == before)
 person = { id = 'owner-42' }
 assert(dependencies.owner(42, 'owner-42', id))
 assert(not dependencies.owner(42, 'other-owner', id))
-print('cooking NUI action routing, exact payloads and server-derived identity passed (mocked)')
+for _, action in ipairs({ 'listStaffRoles', 'listStaff', 'assignStaffMember', 'updateStaffMember', 'removeStaffMember' }) do
+    send(action, {}); assert(response.ok and response.action == action)
+end
+assert(staffCalls == 5)
+print('cooking and staff NUI action routing, exact payloads and server-derived identity passed (mocked)')

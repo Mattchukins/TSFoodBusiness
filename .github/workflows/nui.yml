@@ -20,6 +20,7 @@ jobs:
       - run: lua5.4 tests/inventory.lua
       - run: lua5.4 tests/jobs.lua
       - run: lua5.4 tests/jobs_requests.lua
+      - run: lua5.4 tests/staff.lua
       - run: lua5.4 tests/inventory_mutations.lua
       - run: python3 tests/sql_contract.py
   nui:

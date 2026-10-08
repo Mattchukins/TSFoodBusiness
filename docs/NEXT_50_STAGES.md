@@ -41,8 +41,8 @@ This queue responds to the requested 50-stage continuation. These are implementa
 | 35 | Cold/warm storage rules | Pending |
 | 36 | Business zone storage and validation | Pending |
 | 37 | Visual zone placement | Pending |
-| 38 | Staff role and permission storage | Pending |
-| 39 | Staff assignment and removal | Pending |
+| 38 | Staff role and permission storage | Schema 7 roster, role registry and guarded permission exports implemented; delegated gameplay/live SQL pending |
+| 39 | Staff assignment and removal | Owner-only server-resolved assignment, revisioned edit/removal and React/Tailwind roster implemented; live verification pending |
 | 40 | Duty/shift tracking | Pending |
 | 41 | Supplier purchase-order storage | Pending |
 | 42 | Supplier receiving and stock ledger | Pending |
@@ -57,7 +57,7 @@ This queue responds to the requested 50-stage continuation. These are implementa
 
 Local evidence: tests/production.lua, tests/schema.lua, tests/stations.lua and tests/business_creation.lua pass with mocked FiveM/MySQL; tests/syntax.lua parses sources. TypeScript and Vite production build pass. Migration SQL was not executed against a live database. Inventory operations must not be enabled before provider-specific atomicity/compensation and restart-recovery checks pass.
 
-SQL delivery now has exactly `sql/install.sql` and `sql/uninstall.sql`. The install consolidates all six schema versions and preserves data; the uninstall is destructive. `tests/sql_contract.py` verifies the two-file package, matching table sets and dependency order without executing MySQL. Live installation/upgrade checks remain pending.
+SQL delivery now has exactly `sql/install.sql` and `sql/uninstall.sql`. The install consolidates all seven schema versions and preserves data; the uninstall is destructive. `tests/sql_contract.py` verifies the two-file package, matching table sets and dependency order without executing MySQL. Live installation/upgrade checks remain pending.
 
 Production editor update: owners can check server-read ingredient stock for saved batch settings, including required, available and missing quantities. This is a snapshot without reservation or cooking authorization. Missing or failing inventory adapters return controlled errors. Owners can remove production settings with an audited transaction. Live FiveM, database and provider verification remains pending.
 

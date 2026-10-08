@@ -1,0 +1,95 @@
+import { useEffect, useRef, useState } from 'react'
+export type StaffMember = { id: string; display_name: string; role: string; revision: number }
+export type StaffRole = { id: string; label: string; permissions: string[] }
+export type StaffResponse = { ok: boolean; error?: string; staff?: StaffMember[]; staffRoles?: StaffRole[] }
+const errors: Record<string, string> = {
+  target_unavailable: 'That server ID has no available character. Ask the player to connect first.',
+  target_changed: 'That server ID changed character or disconnected. Verify the player and try again.',
+  already_staff: 'That character is already on this roster. Edit their existing entry.',
+  owner_is_not_staff: 'The business owner already has owner access and cannot be added as staff.',
+  staff_conflict: 'This roster entry changed. Reload the roster before trying again.',
+  transaction_failed: 'The roster change failed. Reload to verify the saved roster.',
+  staff_disabled: 'Staff management is disabled on this server.',
+}
+export function StaffRoster({ businessId, request, busy, onBusy }: {
+  businessId: string; request: (action: string, payload: Record<string, unknown>) => Promise<StaffResponse>
+  busy: boolean; onBusy: (value: boolean) => void
+}) {
+  const [members, setMembers] = useState<StaffMember[]>([])
+  const [roles, setRoles] = useState<StaffRole[]>([])
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [reload, setReload] = useState(0)
+  const [editing, setEditing] = useState<StaffMember | null>(null)
+  const [source, setSource] = useState('')
+  const [name, setName] = useState('')
+  const [role, setRole] = useState('')
+  const [search, setSearch] = useState('')
+  const [message, setMessage] = useState('')
+  const mounted = useRef(true)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useEffect(() => {
+    let active = true
+    setState('loading'); setMembers([]); setRoles([]); setEditing(null); setName(''); setSource(''); setRole(''); setMessage('')
+    void Promise.all([request('listStaff', { businessId }), request('listStaffRoles', {})]).then(([saved, supported]) => {
+      if (!active) return
+      if (!saved.ok || !supported.ok) throw new Error(errors[saved.error || supported.error || ''] || saved.error || supported.error || 'Could not load staff')
+      setMembers(saved.staff || []); setRoles(supported.staffRoles || []); setState('ready')
+    }).catch(error => { if (active) { setState('error'); setMessage(error instanceof Error ? error.message : 'Could not load staff') } })
+    return () => { active = false }
+  }, [businessId, reload, request])
+  function reset() { setEditing(null); setSource(''); setName(''); setRole('') }
+  async function mutate(action: string, payload: Record<string, unknown>) {
+    if (busy || state !== 'ready') return
+    onBusy(true); setMessage('')
+    try {
+      const result = await request(action, { businessId, ...payload })
+      if (!mounted.current) return
+      if (!result.ok) {
+        setMessage(errors[result.error || ''] || result.error || 'Could not change staff')
+        if (['staff_conflict', 'transaction_failed', 'not_found'].includes(result.error || '')) setState('error')
+        return
+      }
+      reset(); setMessage('Staff roster updated.'); setState('loading')
+      const saved = await request('listStaff', { businessId })
+      if (!mounted.current) return
+      if (!saved.ok) { setMembers([]); setState('error'); setMessage('Staff roster updated, but refresh failed. Reload it before making another change.'); return }
+      setMembers(saved.staff || []); setState('ready')
+    } catch { if (mounted.current) { setState('error'); setMessage('The server did not respond. Reload the roster to verify whether the change completed.') } }
+    finally { onBusy(false) }
+  }
+  function save(event: React.FormEvent) {
+    event.preventDefault()
+    if (!roles.some(entry => entry.id === role)) return
+    void mutate(editing ? 'updateStaffMember' : 'assignStaffMember', editing
+      ? { staffId: editing.id, revision: Number(editing.revision), displayName: name.trim(), role }
+      : { targetSource: Number(source), displayName: name.trim(), role })
+  }
+  const filtered = members.filter(member => member.display_name.toLowerCase().includes(search.trim().toLowerCase()))
+  return <section aria-label="Business staff roster">
+    <p>Assign an online character using their current server ID. The roster keeps their character assignment after disconnects. Labels can be edited while staff are offline.</p>
+    <p>Roles are saved for permission integrations. Staff access to this management interface and cooking is still being developed.</p>
+    {state === 'loading' && <p role="status">Loading staff roster…</p>}
+    {state === 'ready' && <>
+      <label>Search roster labels<input type="search" maxLength={80} value={search} onChange={event => setSearch(event.target.value)} /></label>
+      <p>Showing {filtered.length} of {members.length} loaded staff.</p>
+      {members.length === 200 && <p>The first 200 roster entries are loaded.</p>}
+      {members.length === 0 && <p>No staff assigned to this business.</p>}
+      {members.length > 0 && filtered.length === 0 && <p>No roster labels match this search.</p>}
+      <ul className="p-0">{filtered.map(member => <li key={member.id} className="my-3 list-none rounded-lg border border-solid border-border p-3">
+        <p><strong>{member.display_name}</strong> · {roles.find(entry => entry.id === member.role)?.label || member.role}</p>
+        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} aria-label={`Edit ${member.display_name}`} onClick={() => { setEditing(member); setName(member.display_name); setRole(member.role); setSource('') }}>Edit</button>
+          <button type="button" disabled={busy} aria-label={`Remove ${member.display_name}`} onClick={() => { if (window.confirm(`Remove ${member.display_name} from this business?`)) void mutate('removeStaffMember', { staffId: member.id, revision: Number(member.revision) }) }}>Remove</button></div>
+      </li>)}</ul>
+      <h3>{editing ? 'Edit staff member' : 'Assign staff member'}</h3>
+      <form onSubmit={save}>
+        {!editing && <label>Online player server ID<input required disabled={busy} type="number" min="1" max="2147483647" step="1" value={source} onChange={event => setSource(event.target.value)} /></label>}
+        <label>Roster label<input required disabled={busy} minLength={2} maxLength={80} value={name} onChange={event => setName(event.target.value)} /></label>
+        <label>Role<select required disabled={busy} value={role} onChange={event => setRole(event.target.value)}><option value="">Select role</option>{roles.map(entry => <option key={entry.id} value={entry.id}>{entry.label}</option>)}</select></label>
+        <button type="submit" disabled={busy || !roles.some(entry => entry.id === role)}>{editing ? 'Save staff details' : 'Assign staff'}</button>
+        {editing && <button type="button" disabled={busy} onClick={reset}>Cancel edit</button>}
+      </form>
+    </>}
+    <button className="mt-4" type="button" disabled={busy || state === 'loading'} onClick={() => setReload(value => value + 1)}>Reload roster</button>
+    <p role="status" aria-live="polite">{message}</p>
+  </section>
+}

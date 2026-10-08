@@ -28,7 +28,7 @@ GetPlayerRoutingBucket = function() return 7 end
 json = { encode = function() return '{}' end, decode = function(value) return value end }
 MySQL = {
     single = { await = function(query, values)
-        if query:find('tsfb_schema') then return { count = 6, minimum = 1, maximum = 6 } end
+        if query:find('tsfb_schema') then return { count = 7, minimum = 1, maximum = 7 } end
         if query:find('owner_id') then
             assert(values[2] == 'server-owner')
             return owned and { id = id } or nil

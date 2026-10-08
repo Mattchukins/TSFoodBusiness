@@ -1,18 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
+import { StaffRoster, type StaffResponse } from './components/StaffRoster'
 import { KitchenJobs, type CookingResponse } from './components/KitchenJobs'
 import { ProductionEditor } from './components/ProductionEditor'
 import { Panel } from './components/Panel'
 import { StationCard, type Station } from './components/StationCard'
 
-type Page = 'overview' | 'businesses' | 'operations' | 'kitchen' | 'stations' | 'orders' | 'finance' | 'suppliers' | 'activity'
+type Page = 'overview' | 'businesses' | 'operations' | 'kitchen' | 'stations' | 'orders' | 'finance' | 'suppliers' | 'activity' | 'staff'
 const pages: { id: Page; label: string }[] = [
   { id: 'overview', label: 'Overview' }, { id: 'businesses', label: 'Businesses' }, { id: 'operations', label: 'Operations' },
   { id: 'kitchen', label: 'Kitchen' }, { id: 'orders', label: 'Orders' },
   { id: 'finance', label: 'Finance' }, { id: 'suppliers', label: 'Suppliers' },
   { id: 'activity', label: 'Activity' },
   { id: 'stations', label: 'Stations' },
+  { id: 'staff', label: 'Staff' },
 ]
 type Business = { id: string; name: string; type: string }
 type Preset = { id: string; label: string; opensMinute: number; closesMinute: number; seatCapacity: number; queueCapacity: number }
@@ -21,7 +23,7 @@ type Recipe = { id: string; name: string; price_cents: number; ingredients: Ingr
 type Supplier = { id: string; name: string; item_name: string; unit_price_cents: number }
 type Operations = { opens_minute: number; closes_minute: number; seat_capacity: number; queue_capacity: number }
 type AuditEntry = { action: string; details: string; created_at: string | number }
-type Result = CookingResponse & { stockReport?: { available: boolean; ingredients: { item: string; required: number; available: number; missing: number }[] }; productionPlan?: { ingredients: Ingredient[]; outputItem: string; outputQuantity: number; durationSeconds: number; stationType: string; batches: number }; productionProfile?: { station_type: string; output_item: string; output_quantity: number; duration_seconds: number } | null; ok: boolean; error?: string; businesses?: Business[]; presets?: Preset[]; stationTypes?: string[]; recipes?: Recipe[]; suppliers?: Supplier[]; quote?: Recipe; operations?: Operations | null; audit?: AuditEntry[]; stations?: Station[] }
+type Result = CookingResponse & StaffResponse & { stockReport?: { available: boolean; ingredients: { item: string; required: number; available: number; missing: number }[] }; productionPlan?: { ingredients: Ingredient[]; outputItem: string; outputQuantity: number; durationSeconds: number; stationType: string; batches: number }; productionProfile?: { station_type: string; output_item: string; output_quantity: number; duration_seconds: number } | null; ok: boolean; error?: string; businesses?: Business[]; presets?: Preset[]; stationTypes?: string[]; recipes?: Recipe[]; suppliers?: Supplier[]; quote?: Recipe; operations?: Operations | null; audit?: AuditEntry[]; stations?: Station[] }
 async function request(action: string, payload: Record<string, unknown>): Promise<Result> {
   const name = (window as Window & { GetParentResourceName?: () => string }).GetParentResourceName?.()
   if (!name) return { ok: false, error: 'FiveM resource unavailable' }
@@ -323,6 +325,10 @@ function App() {
               <label>Type<select value={businessType} onChange={event => setBusinessType(event.target.value)}>{presets.map(preset => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select></label>
               <button disabled={busy || presets.length === 0} type="submit">Create business</button></form><p role="status" aria-live="polite">{message}</p>
             <p>Creation requires server ACE permission <code>tsfoodbusiness.create</code>.</p></Panel>
+          : page === 'staff' ? <Panel><h2>Business staff</h2>
+            <label>Business<select disabled={busy} value={selectedBusiness} onChange={event => setSelectedBusiness(event.target.value)}><option value="">Select a business</option>{businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+            {selectedBusiness && <StaffRoster key={selectedBusiness} businessId={selectedBusiness} request={request} busy={busy} onBusy={setBusy} />}
+          </Panel>
           : page === 'stations' ? <Panel><h2>Kitchen stations</h2>
             <label>Business<select disabled={busy} value={selectedBusiness} onChange={event => setSelectedBusiness(event.target.value)}><option value="">Select a business</option>{businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
             <p>Stand where the station belongs before opening this screen. Placement saves your current position and direction. Cooking and equipment props are still in development.</p>

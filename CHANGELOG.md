@@ -71,3 +71,11 @@
 - Added owner-only start, server deadlines, fresh finish proximity/instance checks, cancellation, capacity retry and explicit restart receipt reconciliation. State transitions and audit events share transactions.
 - Added React/Tailwind active/recent jobs, recipe/equipment selection and start/finish/cancel/recovery controls with disabled defaults and uncertain-result feedback.
 - Added mocked lifecycle, mutation adapter and NUI routing tests to CI. Live FiveM, MySQL and provider recovery checks remain pending.
+
+### Staff roster — schema 7
+
+- Added a unique business/character staff roster in the consolidated SQL pair, with schema presence and unique-key startup checks.
+- Added owner-only online assignment using server-resolved character identity, offline label/role editing and removal, revision guards and transactional audit events.
+- Added Manager/Cook/Cashier role registry and guarded server permission lookup exports; existing management and cooking remain owner-only.
+- Added a React/Tailwind Staff screen with search, role selection, confirmed removal, reload and uncertain-result feedback.
+- Added mocked source-change, spoofed identity, ownership, stale-write and failure checks to CI. Live FiveM/MySQL/framework validation remains pending.

@@ -4,7 +4,7 @@ Early development, currently **v0.8.0-dev**. [Roadmap](ROADMAP.md) phases v0.1�
 
 ## Local setup
 
-1. Stop the resource, back up the oxmysql database and import `sql/install.sql` with stop-on-error enabled. Use the same file for fresh setup and additive upgrades. Existing data is preserved. The resource refuses database requests unless schema versions 1–6 and required columns are present. The database account must be able to read its own metadata from `information_schema`.
+1. Stop the resource, back up the oxmysql database and import `sql/install.sql` with stop-on-error enabled. Use the same file for fresh setup and additive upgrades. Existing data is preserved. The resource refuses database requests unless schema versions 1–7 and required columns are present. The database account must be able to read its own metadata from `information_schema`.
 2. Start `oxmysql`, `ox_lib`, and exactly one primary framework: ESX, QBCore or QBox. QBox may expose qb-core compatibility without counting as a second framework. Set `FoodBusiness.Framework` explicitly in `shared/config.lua` if auto detection is inappropriate.
 3. Run `cd web && npm install && npm run check && npm run build`. The generated `web/dist` folder must be included with the installed resource.
 4. Add `ensure ts-foodbusiness` after dependencies in `server.cfg`. Grant trusted staff `add_ace group.admin tsfoodbusiness.create allow` or your equivalent ACE mapping.
@@ -51,3 +51,11 @@ Schema 6 adds durable cooking jobs. The Kitchen screen lists saved jobs, lets an
 The kitchen module and inventory mutation verification flag are **off by default**. Implement and live-test the four custom adapter exports described in [INVENTORY_RESERVATIONS.md](docs/INVENTORY_RESERVATIONS.md) before setting `FoodBusiness.Modules.kitchen = true` and `FoodBusiness.Inventory.mutationsVerified = true`. These flags are operator attestations, not automatic provider certification. No native ox_inventory/QB/ESX mutation provider is included. See [the 20-step batch](docs/COOKING_BATCH_20.md) for implementation evidence and remaining verification.
 
 After a disconnect or restart, load Kitchen jobs and choose **Check recovery status**. This reads the durable provider receipt and reconciles known results. A lost reservation response restarts the full preparation duration. A lost commit response reconciles to completed without another output transfer. There is no automatic background fulfillment. An uncertain or unavailable provider keeps the job and its slots held; never manually delete a pending job or refund it without reconciling its receipt.
+
+## Staff roster
+
+The **Staff** screen lets a business owner assign an online character by current player server ID, set a roster label and choose Manager, Cook or Cashier. The server resolves the character identity; the browser never supplies it. Owners can edit labels/roles and remove staff while those characters are offline. Membership is unique per business and character, and changes include revision checks and transactional audit events. Import the current `sql/install.sql` with the resource stopped to add schema 7. `FoodBusiness.Modules.staff` controls the roster and role integrations.
+
+`GetBusinessStaffRole(source, businessId)` returns `owner`, a saved role, or nil when no verified role is available. `HasBusinessStaffPermission(source, businessId, permission)` supports `cook`, `take_orders` and `manage_catalog`: owners/managers have all three, cooks have `cook`, and cashiers have `take_orders`. It returns true/false for a resolved role, nil when role lookup fails or membership is missing, and false for unknown permissions. Callers must require `== true` and recheck before mutation. Live source identity is checked after awaited reads.
+
+These exports are integration prerequisites. Existing management and cooking actions remain owner-only; the staff roster does not yet grant staff access to those screens or jobs. Duty/shift tracking and delegated staff workflows remain pending. Live database persistence, concurrency and each framework's character switching require verification.

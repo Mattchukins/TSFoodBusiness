@@ -67,6 +67,10 @@ local function handleRequest(src, request)
     if not person or not validText(person.id, 80) then
         respond(src, request.requestId, { ok = false, error = 'identity_unavailable' }); return
     end
+    if request.action == 'listStaffRoles' or request.action == 'listStaff' or request.action == 'assignStaffMember'
+        or request.action == 'updateStaffMember' or request.action == 'removeStaffMember' then
+        respond(src, request.requestId, Staff.handle(src, person.id, request.action, request.data)); return
+    end
     local jobActions = { listCookingJobs = 'list', startCookingJob = 'start',
         finishCookingJob = 'finish', cancelCookingJob = 'cancel',
         inspectCookingJob = 'inspect', resumeCookingJob = 'resume' }
@@ -602,3 +606,12 @@ if CookingJobs then
         end,
     })
 end
+
+exports('GetBusinessStaffRole', function(src, businessId)
+    if not ready then return nil end
+    return Staff.role(src, businessId)
+end)
+exports('HasBusinessStaffPermission', function(src, businessId, permission)
+    if not ready then return nil end
+    return Staff.permission(src, businessId, permission)
+end)
