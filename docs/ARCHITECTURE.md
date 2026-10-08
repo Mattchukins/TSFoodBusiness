@@ -1,8 +1,8 @@
-# Architecture and trust boundaries (v0.4.0-dev)
+# Architecture and trust boundaries (v0.8.0-dev)
 
 ## Current implementation
 
-`fxmanifest.lua` loads oxmysql, ox_lib, shared configuration, framework selection, a server schema gate and a Lua client NUI bridge. The development `/foodbusiness_ui` command opens the React shell. The `close` and `request` callbacks check payloads; the allowlist covers business, recipe and supplier catalog actions plus a read-only recipe price quote. The latter derives character identity on the server, checks ACE permission and writes a business and audit row in one local transaction. `sql/001_initial.sql` and `sql/002_catalogs.sql` are imported manually. Startup refuses business requests if the schema check fails. These source paths have not been live verified.
+`fxmanifest.lua` loads oxmysql, ox_lib, shared configuration, framework selection, a server schema gate and a Lua client NUI bridge. The development `/foodbusiness_ui` command opens the React shell. The `close` and `request` callbacks check payloads; the allowlist covers business, recipe and supplier catalog actions, a read-only recipe price quote, owner-only operating profiles and persistent station placements. The server derives character identity; creation checks ACE permission, and mutations write an audit row in one local transaction. `sql/install.sql` is imported manually for installation/additive upgrade; `sql/uninstall.sql` is the separate destructive removal script. Startup refuses business requests if the schema check fails. These source paths have not been live verified.
 
 ## Service ownership
 
@@ -30,3 +30,7 @@ Untrusted NUI/client input, forged business IDs, replayed payment requests, dupl
 **ADR 0002:** Banking and billing remain independently selected. Native money and internal ledger will support standalone operation.
 
 **ADR 0003:** Use React/TypeScript and Lua NUI callbacks, following observed sibling design conventions recorded in [NUI_DESIGN.md](NUI_DESIGN.md).
+
+Production profiles are owner-scoped via a recipe/business lookup. `getProductionProfile` returns one configuration or no profile; `setProductionProfile` accepts only businessId, recipeId and a validated profile, upserts by recipe_id and writes recipe.production audit in the same SQL transaction. This provides configuration, not inventory availability or cook authorization.
+
+GetOwnerProductionPlan is a server-only read integration. It resolves the server identity, verifies business ownership, scopes recipe/station reads to that business and plans against persisted production settings. It returns no plan on missing/invalid/incompatible data or database errors; it does not reserve inventory or authorize cooking.

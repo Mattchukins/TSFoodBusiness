@@ -4,6 +4,21 @@ on:
     branches: [main]
   pull_request:
 jobs:
+  lua:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y lua5.4
+      - run: lua5.4 tests/syntax.lua
+      - run: lua5.4 tests/operations.lua
+      - run: lua5.4 tests/presets.lua
+      - run: lua5.4 tests/business_creation.lua
+      - run: lua5.4 tests/recipes.lua
+      - run: lua5.4 tests/schema.lua
+      - run: lua5.4 tests/stations.lua
+      - run: lua5.4 tests/production.lua
+      - run: lua5.4 tests/inventory.lua
+      - run: python3 tests/sql_contract.py
   nui:
     runs-on: ubuntu-latest
     defaults:
