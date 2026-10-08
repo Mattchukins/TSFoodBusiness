@@ -4,11 +4,11 @@ Early development, currently **v0.8.0-dev**. [Roadmap](ROADMAP.md) phases v0.1�
 
 ## Local setup
 
-1. Stop the resource, back up the oxmysql database and import `sql/install.sql` with stop-on-error enabled. Use the same file for fresh setup and additive upgrades. Existing data is preserved. The resource refuses database requests unless schema versions 1–5 and required columns are present. The database account must be able to read its own metadata from `information_schema`.
+1. Stop the resource, back up the oxmysql database and import `sql/install.sql` with stop-on-error enabled. Use the same file for fresh setup and additive upgrades. Existing data is preserved. The resource refuses database requests unless schema versions 1–6 and required columns are present. The database account must be able to read its own metadata from `information_schema`.
 2. Start `oxmysql`, `ox_lib`, and exactly one primary framework: ESX, QBCore or QBox. QBox may expose qb-core compatibility without counting as a second framework. Set `FoodBusiness.Framework` explicitly in `shared/config.lua` if auto detection is inappropriate.
 3. Run `cd web && npm install && npm run check && npm run build`. The generated `web/dist` folder must be included with the installed resource.
 4. Add `ensure ts-foodbusiness` after dependencies in `server.cfg`. Grant trusted staff `add_ace group.admin tsfoodbusiness.create allow` or your equivalent ACE mapping.
-5. Use `/foodbusiness_ui` to open the development interface. Trusted staff can create one of eight configured business types with a default operating profile; an owner can add recipes and supplier catalog entries. Cooking, purchasing, checkout and payments are disabled.
+5. Use `/foodbusiness_ui` to open the development interface. Trusted staff can create one of eight configured business types with a default operating profile; an owner can add recipes and supplier catalog entries. Cooking is disabled by default; purchasing, checkout and payments remain disabled.
 
 Do not advertise ESX/QBCore/QBox support until each is tested live. See [compatibility](docs/COMPATIBILITY.md), [architecture](docs/ARCHITECTURE.md) and [release gates](docs/RELEASE_GATES.md).
 
@@ -24,7 +24,7 @@ Use `web/src/components/Panel.tsx` for management surfaces and their common form
 
 ## Recipe production setup
 
-In Kitchen, choose **Production settings** for an owned recipe. Set a supported equipment type, output item, output quantity (1–100) and preparation seconds (1–3600). Existing recipes start unconfigured; no food item is inferred from the recipe name. Settings are persisted separately and removed by the recipe foreign key when that recipe is deleted. Output item names are validated syntactically; existence in a configured inventory is not verified yet. Cooking remains disabled. See `docs/NEXT_50_STAGES.md` for the remaining implementation queue.
+In Kitchen, choose **Production settings** for an owned recipe. Set a supported equipment type, output item, output quantity (1–100) and preparation seconds (1–3600). Existing recipes start unconfigured; no food item is inferred from the recipe name. Settings are persisted separately and removed by the recipe foreign key when that recipe is deleted. Output item names are validated syntactically; existence in a configured inventory is not verified yet. Cooking is disabled by default. See `docs/NEXT_50_STAGES.md` for the remaining implementation queue.
 
 ## Uninstall
 
@@ -36,4 +36,18 @@ Server integrations can call `exports['ts-foodbusiness']:GetOwnerProductionPlan(
 
 Inventory is disabled by default. A server integrator can set `FoodBusiness.Inventory.provider = 'custom'`, the adapter resource name, and two export names in `shared/config.lua`. The adapter must expose server exports `ItemExists(itemName)` returning a strict boolean and `GetItemCount(source, itemName)` returning a nonnegative integer; these are our adapter contracts, not existing provider APIs. The adapter resource must be started. Wire those exports to the chosen inventory using its verified API. No native ox_inventory/QB/ESX inventory adapter is claimed implemented.
 
-`GetInventoryCapabilities` reports whether reads are configured; reservation, atomic production and compensation remain false. `GetOwnerIngredientAvailability(source, businessId, recipeId, stationId, batches)` checks the owner-scoped production plan and reports required/available/missing ingredients plus `reservation = false`. A nil report includes a failure reason. Counts are a snapshot, not a guarantee that a later cook can consume ingredients; capacity and output creation are not checked. Provider errors, stopped resources and invalid return types fail closed.
+`GetInventoryCapabilities` reports whether reads are configured; reservation and atomic production remain false unless the operator explicitly enables a verified custom mutation adapter. Compensation remains false; this workflow requires atomic commit and durable release. `GetOwnerIngredientAvailability(source, businessId, recipeId, stationId, batches)` checks the owner-scoped production plan and reports required/available/missing ingredients plus `reservation = false`. A nil report includes a failure reason. Counts are a snapshot, not a guarantee that a later cook can consume ingredients; capacity and output creation are not checked. Provider errors, stopped resources and invalid return types fail closed.
+
+In Production settings, **Preview requirements** calculates 1–100 batches using the saved recipe/profile. Save changes before previewing. This preview checks configuration only; it does not verify station placement, proximity or inventory availability.
+
+Production editor update: owners can check server-read ingredient stock for saved batch settings, including required, available and missing quantities. This is a snapshot without reservation or cooking authorization. Missing or failing inventory adapters return controlled errors. Owners can remove production settings with an audited transaction. Live FiveM, database and provider verification remains pending.
+
+Server integrations may use `GetOwnerProductionReadiness(source, businessId, recipeId, stationId, batches)` to inspect stock and live station proximity together. It always returns `canStart = false`; it is not cooking authorization. See [the inventory reservation contract](docs/INVENTORY_RESERVATIONS.md) for prerequisites before implementing mutations.
+
+## Cooking job development
+
+Schema 6 adds durable cooking jobs. The Kitchen screen lists saved jobs, lets an owner select a recipe and station, and offers start, finish, cancellation, reservation retries and explicit recovery checks. Server start/finish require a compatible owned station within two metres in the same routing bucket. Each player and station holds at most one active job. A saved job retains its original plan even if the recipe changes. Its timer and every transition are server controlled; the browser countdown is an estimate.
+
+The kitchen module and inventory mutation verification flag are **off by default**. Implement and live-test the four custom adapter exports described in [INVENTORY_RESERVATIONS.md](docs/INVENTORY_RESERVATIONS.md) before setting `FoodBusiness.Modules.kitchen = true` and `FoodBusiness.Inventory.mutationsVerified = true`. These flags are operator attestations, not automatic provider certification. No native ox_inventory/QB/ESX mutation provider is included. See [the 20-step batch](docs/COOKING_BATCH_20.md) for implementation evidence and remaining verification.
+
+After a disconnect or restart, load Kitchen jobs and choose **Check recovery status**. This reads the durable provider receipt and reconciles known results. A lost reservation response restarts the full preparation duration. A lost commit response reconciles to completed without another output transfer. There is no automatic background fulfillment. An uncertain or unavailable provider keeps the job and its slots held; never manually delete a pending job or refund it without reconciling its receipt.

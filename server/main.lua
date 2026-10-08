@@ -44,7 +44,7 @@ CreateThread(function()
     end)
     if not success or not schema or tonumber(schema.count) ~= FoodBusiness.RequiredSchema
         or tonumber(schema.minimum) ~= 1 or tonumber(schema.maximum) ~= FoodBusiness.RequiredSchema then
-        print('[ts-foodbusiness] disabled: apply sql/001_initial.sql through sql/004_stations.sql; expected schema ' .. FoodBusiness.RequiredSchema)
+        print('[ts-foodbusiness] disabled: apply sql/install.sql; expected schema ' .. FoodBusiness.RequiredSchema)
         return
     end
     local verified, reason = Schema.verify()
@@ -66,6 +66,23 @@ local function handleRequest(src, request)
     local person = Framework.player(src)
     if not person or not validText(person.id, 80) then
         respond(src, request.requestId, { ok = false, error = 'identity_unavailable' }); return
+    end
+    local jobActions = { listCookingJobs = 'list', startCookingJob = 'start',
+        finishCookingJob = 'finish', cancelCookingJob = 'cancel',
+        inspectCookingJob = 'inspect', resumeCookingJob = 'resume' }
+    local jobAction = jobActions[request.action]
+    if jobAction then
+        local data = request.data
+        local keys = jobAction == 'list' and { businessId = true }
+            or jobAction == 'start' and { businessId = true, recipeId = true, stationId = true, batches = true, token = true }
+            or { businessId = true, jobId = true }
+        if not exactKeys(data, keys) or not FoodBusiness.validJobId(data.businessId) then
+            respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+        end
+        local result = jobAction == 'list' and CookingJobs.list(src, person.id, data.businessId)
+            or jobAction == 'start' and CookingJobs.start(src, person.id, data)
+            or CookingJobs.act(src, person.id, data, jobAction)
+        respond(src, request.requestId, result); return
     end
     if request.action == 'listPresets' then
         if next(request.data) ~= nil then
@@ -175,24 +192,49 @@ local function handleRequest(src, request)
         or request.action == 'createSupplier' or request.action == 'deleteRecipe'
         or request.action == 'updateRecipe' or request.action == 'updateSupplier'
         or request.action == 'deleteSupplier' or request.action == 'listAudit'
-        or request.action == 'getProductionProfile' or request.action == 'setProductionProfile'
+        or request.action == 'getProductionProfile' or request.action == 'setProductionProfile' or request.action == 'previewProduction' or request.action == 'checkProductionStock' or request.action == 'deleteProductionProfile'
         or request.action == 'listStations' or request.action == 'createStation'
         or request.action == 'deleteStation' or request.action == 'moveStation' or request.action == 'updateStation') and validId(request.data.businessId) then
         local data = request.data
         local business = MySQL.single.await('SELECT id FROM tsfb_businesses WHERE id = ? AND owner_id = ?',
             { data.businessId, person.id })
         if not business then respond(src, request.requestId, { ok = false, error = 'forbidden' }); return end
-        if (request.action == 'getProductionProfile' or request.action == 'setProductionProfile') and FoodBusiness.Modules.recipes then
+        if (request.action == 'getProductionProfile' or request.action == 'setProductionProfile' or request.action == 'previewProduction' or request.action == 'checkProductionStock' or request.action == 'deleteProductionProfile') and FoodBusiness.Modules.recipes then
             local writing = request.action == 'setProductionProfile'
-            local allowed = writing and { businessId = true, recipeId = true, profile = true } or { businessId = true, recipeId = true }
+            local checking = request.action == 'checkProductionStock'
+            local deleting = request.action == 'deleteProductionProfile'
+            local preview = request.action == 'previewProduction' or checking
+            local allowed = preview and { businessId = true, recipeId = true, batches = true } or writing and { businessId = true, recipeId = true, profile = true } or { businessId = true, recipeId = true }
             if not exactKeys(data, allowed) or not validId(data.recipeId)
+                or (preview and not validInteger(data.batches, 1, 100))
                 or (writing and not FoodBusiness.validProductionProfile(data.profile)) then
                 respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
             end
-            local recipe = MySQL.single.await('SELECT id FROM tsfb_recipes WHERE id = ? AND business_id = ?', { data.recipeId, data.businessId })
+            local recipe = MySQL.single.await('SELECT id, ingredients FROM tsfb_recipes WHERE id = ? AND business_id = ?', { data.recipeId, data.businessId })
             if not recipe then respond(src, request.requestId, { ok = false, error = 'not_found' }); return end
+            if deleting then
+                local ok, done = pcall(function() return MySQL.transaction.await({
+                    { query = 'DELETE FROM tsfb_production_profiles WHERE recipe_id = ?', values = { data.recipeId } },
+                    { query = 'INSERT INTO tsfb_audit (action, actor_id, business_id, correlation_id, details) VALUES (?, ?, ?, ?, ?)',
+                        values = { 'recipe.production.delete', person.id, data.businessId, person.id .. ':' .. request.requestId, json.encode({ recipeId = data.recipeId }) } },
+                }) end)
+                respond(src, request.requestId, ok and done and { ok = true } or { ok = false, error = 'transaction_failed' }); return
+            end
             if not writing then
                 local profile = MySQL.single.await('SELECT station_type, output_item, output_quantity, duration_seconds FROM tsfb_production_profiles WHERE recipe_id = ?', { data.recipeId })
+                if preview then
+                    if not profile then respond(src, request.requestId, { ok = false, error = 'production_unconfigured' }); return end
+                    local plan = FoodBusiness.planProduction(json.decode(recipe.ingredients), {
+                        stationType = profile.station_type, outputItem = profile.output_item,
+                        outputQuantity = tonumber(profile.output_quantity), durationSeconds = tonumber(profile.duration_seconds),
+                    }, profile.station_type, data.batches)
+                    if checking and plan then
+                        local ok, report, reason = pcall(Inventory.inspectPlan, src, plan)
+                        respond(src, request.requestId, ok and report and { ok = true, productionPlan = plan, stockReport = report }
+                            or { ok = false, error = ok and (reason or 'inventory_unavailable') or 'inventory_error' }); return
+                    end
+                    respond(src, request.requestId, plan and { ok = true, productionPlan = plan } or { ok = false, error = 'invalid_production_configuration' }); return
+                end
                 respond(src, request.requestId, { ok = true, productionProfile = profile }); return
             end
             local profile = data.profile
@@ -511,3 +553,52 @@ exports('GetOwnerIngredientAvailability', function(src, businessId, recipeId, st
     if not ok then return nil, 'inventory_error' end
     return report, reason
 end)
+
+-- Read-only prerequisites. This result is never a reservation or permission to start cooking.
+exports('GetOwnerProductionReadiness', function(src, businessId, recipeId, stationId, batches)
+    local plan = getOwnerProductionPlan(src, businessId, recipeId, stationId, batches)
+    if not plan then return nil, 'production_plan_unavailable' end
+    local ok, result, reason = pcall(function()
+        local report, inventoryError = Inventory.inspectPlan(src, plan)
+        if not report then return nil, inventoryError end
+        -- Re-read the station and live player state after inventory/database awaits.
+        local station = MySQL.single.await('SELECT type, x, y, z, heading, routing_bucket FROM tsfb_stations WHERE id = ? AND business_id = ?', { stationId, businessId })
+        if not station or station.type ~= plan.stationType then return nil, 'station_unavailable' end
+        local person = Framework.player(src)
+        if not person or not validText(person.id, 80) then return nil, 'player_unavailable' end
+        local business = MySQL.single.await('SELECT id FROM tsfb_businesses WHERE id = ? AND owner_id = ?', { businessId, person.id })
+        if not business then return nil, 'forbidden' end
+        local ped = GetPlayerPed(src)
+        if not ped or ped == 0 then return nil, 'position_unavailable' end
+        local coords = GetEntityCoords(ped)
+        if not coords then return nil, 'position_unavailable' end
+        local near = FoodBusiness.isNearStation(station, coords.x, coords.y, coords.z, GetPlayerRoutingBucket(src), 2.0)
+        return { productionPlan = plan, stockReport = report, nearStation = near,
+            prerequisitesMet = near and report.available == true, canStart = false, reservation = false }
+    end)
+    if not ok then return nil, 'readiness_unavailable' end
+    return result, reason
+end)
+
+if CookingJobs then
+    CookingJobs.configure({
+        plan = getOwnerProductionPlan,
+        owner = function(src, actor, businessId)
+            if not ready then return false end
+            local person = Framework.player(src)
+            if not person or person.id ~= actor then return false end
+            return MySQL.single.await('SELECT id FROM tsfb_businesses WHERE id = ? AND owner_id = ?', { businessId, actor }) ~= nil
+        end,
+        near = function(src, actor, businessId, stationId, plan)
+            if not ready or not plan then return false end
+            local station = MySQL.single.await('SELECT type, x, y, z, heading, routing_bucket FROM tsfb_stations WHERE id = ? AND business_id = ?', { stationId, businessId })
+            if not station or station.type ~= plan.stationType then return false end
+            local person = Framework.player(src)
+            if not person or person.id ~= actor then return false end
+            local ped = GetPlayerPed(src)
+            if not ped or ped == 0 then return false end
+            local coords = GetEntityCoords(ped)
+            return coords ~= nil and FoodBusiness.isNearStation(station, coords.x, coords.y, coords.z, GetPlayerRoutingBucket(src), 2.0)
+        end,
+    })
+end

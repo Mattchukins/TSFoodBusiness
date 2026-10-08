@@ -14,9 +14,18 @@ local function provider()
         or type(config.countExport) ~= 'string' or not config.countExport:match('^[%w_]+$') then return nil end
     return config
 end
+local function mutationProvider()
+    local config = provider()
+    if not config or config.mutationsVerified ~= true then return nil end
+    for _, key in ipairs({ 'inspectExport', 'reserveExport', 'commitExport', 'releaseExport' }) do
+        if type(config[key]) ~= 'string' or not config[key]:match('^[%w_]+$') then return nil end
+    end
+    return config
+end
 function Inventory.capabilities()
+    local mutations = mutationProvider() ~= nil
     return { configured = provider() ~= nil, itemLookup = provider() ~= nil, countRead = provider() ~= nil,
-        reservation = false, atomicProduction = false, compensation = false }
+        reservation = mutations, atomicProduction = mutations, compensation = false, durableRecovery = mutations, outputCapacity = mutations }
 end
 function Inventory.itemExists(item)
     if not itemName(item) then return nil, 'invalid_item' end
@@ -44,6 +53,18 @@ end
 function Inventory.inspectPlan(src, plan)
     if type(plan) ~= 'table' or type(plan.ingredients) ~= 'table' or #plan.ingredients < 1 or #plan.ingredients > 16
         or not itemName(plan.outputItem) then return nil, 'invalid_plan' end
+    -- Validate the entire dense array before invoking any provider exports.
+    local length, seen = #plan.ingredients, {}
+    for key, entry in pairs(plan.ingredients) do
+        if type(key) ~= 'number' or key ~= math.floor(key) or key < 1 or key > length
+            or type(entry) ~= 'table' or not itemName(entry.item) or seen[entry.item]
+            or not integer(entry.quantity, 100000) or entry.quantity == 0 then return nil, 'invalid_plan' end
+        seen[entry.item] = true
+    end
+    for index = 1, length do
+        if plan.ingredients[index] == nil then return nil, 'invalid_plan' end
+    end
+    if not integer(src, 2147483647) or src == 0 then return nil, 'invalid_arguments' end
     local outputExists, outputError = Inventory.itemExists(plan.outputItem)
     if outputExists == nil then return nil, outputError end
     if not outputExists then return nil, 'unknown_output_item' end
@@ -63,3 +84,34 @@ function Inventory.inspectPlan(src, plan)
     end
     return { available = available, ingredients = rows, outputItem = plan.outputItem, reservation = false }
 end
+
+local function productionOperation(operation, job)
+    local config = mutationProvider()
+    if not config then return nil, 'inventory_mutations_disabled' end
+    if type(job) ~= 'table' or not FoodBusiness.validJobId(job.id)
+        or type(job.actor_id) ~= 'string' or #job.actor_id < 2 or #job.actor_id > 80
+        or type(job.plan_key) ~= 'string' or #job.plan_key > 1600
+        or job.provider_resource ~= config.resource then return nil, 'invalid_reservation' end
+    local decoded, plan = pcall(json.decode, job.plan_json)
+    if not decoded or FoodBusiness.productionPlanKey(plan) ~= job.plan_key then return nil, 'invalid_reservation' end
+    local ok, receipt = pcall(function()
+        local proxy = exports[config.resource]
+        return proxy[config[operation .. 'Export']](proxy, {
+            jobId = job.id, ownerId = job.actor_id, planKey = job.plan_key, plan = plan,
+        })
+    end)
+    if not ok or type(receipt) ~= 'table' or receipt.jobId ~= job.id
+        or receipt.ownerId ~= job.actor_id or receipt.planKey ~= job.plan_key
+        or (receipt.state ~= 'absent' and receipt.state ~= 'reserved' and receipt.state ~= 'committed' and receipt.state ~= 'released') then
+        return nil, 'inventory_outcome_unknown'
+    end
+    if receipt.error ~= nil and not ((receipt.error == 'insufficient_stock' and receipt.state == 'absent')
+        or (receipt.error == 'output_full' and receipt.state == 'reserved')) then
+        return nil, 'inventory_outcome_unknown'
+    end
+    return { state = receipt.state, error = receipt.error }
+end
+function Inventory.inspectReservation(job) return productionOperation('inspect', job) end
+function Inventory.reserve(job) return productionOperation('reserve', job) end
+function Inventory.commit(job) return productionOperation('commit', job) end
+function Inventory.release(job) return productionOperation('release', job) end

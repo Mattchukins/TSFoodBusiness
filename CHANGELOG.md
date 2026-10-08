@@ -2,7 +2,9 @@
 
 ## Unreleased — v0.8.0-dev
 
-- Added a disabled-by-default custom server inventory read contract, strict item/count validation, missing-ingredient reports and owner-scoped availability exports. Reservation and production mutations remain unavailable.
+- Added owner-scoped saved-recipe batch preview in React/Tailwind with server-calculated ingredient/output quantities and sequential preparation time; it does not reserve stock.
+
+- Added a disabled-by-default custom server inventory read contract, strict item/count validation, missing-ingredient reports and owner-scoped availability exports. Reservation and production mutations are disabled by default.
 
 - Consolidated SQL delivery into exactly install.sql and uninstall.sql, with additive installation, child-first uninstall and package contract checks.
 - Added GetOwnerProductionPlan server read with scoped ownership/recipe/station lookup and bounded batch planning; no inventory mutation.
@@ -54,3 +56,18 @@
 ## v0.0.0 bootstrap
 
 - Added resource layout, React/TypeScript NUI preview, static build workflow and planning documents.
+
+- Added owner-scoped production stock checks and React/Tailwind missing-ingredient display.
+- Added confirmed production settings removal with transactional audit and controlled failure responses.
+
+- Added read-only owner production readiness with fresh station, ownership, distance and routing-bucket checks after inventory reads. Cooking remains disabled.
+- Reject sparse or malformed ingredient plans before invoking inventory providers.
+- Documented reservation, replay, atomic output and recovery requirements for future inventory mutations.
+
+### Cooking implementation batch — schema 6
+
+- Added custom reservation inspection/reserve/atomic commit/release contracts with explicit operator verification opt-in, immutable plan identity and strict receipt validation. No native inventory provider is included.
+- Added immutable cooking job storage, actor/token replay keys, active player/station slots and schema integrity checks in the existing install/uninstall SQL pair.
+- Added owner-only start, server deadlines, fresh finish proximity/instance checks, cancellation, capacity retry and explicit restart receipt reconciliation. State transitions and audit events share transactions.
+- Added React/Tailwind active/recent jobs, recipe/equipment selection and start/finish/cancel/recovery controls with disabled defaults and uncertain-result feedback.
+- Added mocked lifecycle, mutation adapter and NUI routing tests to CI. Live FiveM, MySQL and provider recovery checks remain pending.

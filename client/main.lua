@@ -22,6 +22,9 @@ end)
 RegisterNUICallback('request', function(data, cb)
     if type(data) ~= 'table' or type(data.action) ~= 'string' or type(data.payload) ~= 'table'
         or (data.action ~= 'listBusinesses' and data.action ~= 'listPresets' and data.action ~= 'listStationTypes'
+            and data.action ~= 'listCookingJobs' and data.action ~= 'startCookingJob'
+            and data.action ~= 'finishCookingJob' and data.action ~= 'cancelCookingJob'
+            and data.action ~= 'inspectCookingJob' and data.action ~= 'resumeCookingJob'
             and data.action ~= 'createBusiness'
             and data.action ~= 'renameBusiness'
             and data.action ~= 'listAudit'
@@ -29,7 +32,7 @@ RegisterNUICallback('request', function(data, cb)
             and data.action ~= 'deleteStation'
             and data.action ~= 'moveStation'
             and data.action ~= 'updateStation'
-            and data.action ~= 'getProductionProfile' and data.action ~= 'setProductionProfile'
+            and data.action ~= 'checkProductionStock' and data.action ~= 'deleteProductionProfile' and data.action ~= 'previewProduction' and data.action ~= 'getProductionProfile' and data.action ~= 'setProductionProfile'
             and data.action ~= 'getOperations' and data.action ~= 'setOperations'
             and data.action ~= 'listRecipes' and data.action ~= 'createRecipe'
             and data.action ~= 'listSuppliers' and data.action ~= 'createSupplier'

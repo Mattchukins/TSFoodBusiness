@@ -28,7 +28,7 @@ GetPlayerRoutingBucket = function() return 7 end
 json = { encode = function() return '{}' end, decode = function(value) return value end }
 MySQL = {
     single = { await = function(query, values)
-        if query:find('tsfb_schema') then return { count = 5, minimum = 1, maximum = 5 } end
+        if query:find('tsfb_schema') then return { count = 6, minimum = 1, maximum = 6 } end
         if query:find('owner_id') then
             assert(values[2] == 'server-owner')
             return owned and { id = id } or nil
@@ -38,10 +38,15 @@ MySQL = {
             assert(query:find('WHERE id = ? AND business_id = ?', 1, true))
             assert(values[1] == id and values[2] == id)
         end
+        if query:find('SELECT type, x, y, z', 1, true) then
+            assert(values[1] == id and values[2] == id)
+            return stationExists and { type = 'oven', x = 10, y = 20, z = 30, heading = 90, routing_bucket = 7 } or nil
+        end
         if query:find('SELECT x, y, z') then
             assert(values[1] == id and values[2] == id)
             return stationExists and { x = 10, y = 20, z = 30, heading = 90, routing_bucket = 7 } or nil
         end
+        if query:find('SELECT id, ingredients', 1, true) then return stationExists and { id = id, ingredients = { { item = 'flour', quantity = 3 } } } or nil end
         if query:find('SELECT ingredients') then return stationExists and { ingredients = { { item = 'flour', quantity = 3 } } } or nil end
         if query:find('SELECT type FROM tsfb_stations') then
             assert(values[1] == id and values[2] == id)
@@ -109,6 +114,20 @@ assert(result.ok and result.productionProfile.output_item == 'bread')
 success = false
 send('setProductionProfile', { businessId = id, recipeId = id, profile = profile })
 assert(result.error == 'transaction_failed')
+timer = 6000
+send('previewProduction', { businessId = id, recipeId = id, batches = 2 })
+assert(result.ok and result.productionPlan.outputQuantity == 4 and result.productionPlan.ingredients[1].quantity == 6)
+send('previewProduction', { businessId = id, recipeId = id, batches = 101 })
+assert(result.error == 'invalid_payload')
+owned = false
+send('previewProduction', { businessId = id, recipeId = id, batches = 2 })
+assert(result.error == 'forbidden')
+owned = true
+local previousProfile = savedProfile
+savedProfile = nil
+send('previewProduction', { businessId = id, recipeId = id, batches = 2 })
+assert(result.error == 'production_unconfigured')
+savedProfile = previousProfile
 local integrationPlan = exported.GetOwnerProductionPlan
 assert(integrationPlan(42, id, id, id, 2).ingredients[1].quantity == 6)
 assert(integrationPlan(42, id, id, id, 0) == nil)
@@ -150,9 +169,55 @@ assert(exported.GetOwnerIngredientAvailability(42, id, id, id, 2).available == f
 owned = false
 assert(exported.GetOwnerIngredientAvailability(42, id, id, id, 2) == nil and inspections == 1)
 owned = true
+timer = 9000
+send('checkProductionStock', { businessId = id, recipeId = id, batches = 2 })
+assert(result.ok and result.stockReport.available == false and result.productionPlan.outputQuantity == 4)
+owned = false
+local before = inspections
+send('checkProductionStock', { businessId = id, recipeId = id, batches = 2 })
+assert(result.error == 'forbidden' and inspections == before)
+send('deleteProductionProfile', { businessId = id, recipeId = id })
+assert(result.error == 'forbidden')
+owned = true
+send('deleteProductionProfile', { businessId = id, recipeId = id, injected = true })
+assert(result.error == 'invalid_payload')
+MySQL.transaction.await = function(statements) transaction = statements; return true end
+send('deleteProductionProfile', { businessId = id, recipeId = id })
+assert(result.ok and transaction[1].query:find('DELETE FROM tsfb_production_profiles', 1, true))
+assert(transaction[2].values[1] == 'recipe.production.delete')
+MySQL.transaction.await = function() return false end
+send('deleteProductionProfile', { businessId = id, recipeId = id })
+assert(result.error == 'transaction_failed')
+Inventory.inspectPlan = function() return nil, 'inventory_unavailable' end
+send('checkProductionStock', { businessId = id, recipeId = id, batches = 2 })
+assert(result.error == 'inventory_unavailable')
 Inventory.inspectPlan = function() error('inventory unavailable') end
+send('checkProductionStock', { businessId = id, recipeId = id, batches = 2 })
+assert(result.error == 'inventory_error')
 local unavailable, inventoryError = exported.GetOwnerIngredientAvailability(42, id, id, id, 2)
 assert(unavailable == nil and inventoryError == 'inventory_error')
+Inventory.inspectPlan = function() return { available = true, ingredients = {} } end
+local readiness = exported.GetOwnerProductionReadiness
+local readyReport = readiness(42, id, id, id, 2)
+assert(readyReport.prerequisitesMet and readyReport.nearStation and not readyReport.canStart and not readyReport.reservation)
+positionValid = false
+assert(not readiness(42, id, id, id, 2).prerequisitesMet)
+positionValid = true
+GetPlayerRoutingBucket = function() return 8 end
+assert(not readiness(42, id, id, id, 2).nearStation)
+GetPlayerRoutingBucket = function() return 7 end
+Inventory.inspectPlan = function() return { available = false, ingredients = {} } end
+assert(not readiness(42, id, id, id, 2).prerequisitesMet)
+Inventory.inspectPlan = function() return nil, 'inventory_unavailable' end
+local denied, why = readiness(42, id, id, id, 2)
+assert(denied == nil and why == 'inventory_unavailable')
+Inventory.inspectPlan = function() owned = false; return { available = true } end
+assert(readiness(42, id, id, id, 2) == nil)
+owned = true
+Inventory.inspectPlan = function() error('provider failed') end
+local failed, failure = readiness(42, id, id, id, 2)
+assert(failed == nil and failure == 'readiness_unavailable')
+assert(readiness(0, id, id, id, 2) == nil)
 MySQL.single.await = function() error('database unavailable') end
 assert(integrationPlan(42, id, id, id, 2) == nil)
 print('owner-scoped production plan integration contracts passed')

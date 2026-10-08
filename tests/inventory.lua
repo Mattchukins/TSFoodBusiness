@@ -29,6 +29,16 @@ started = true
 assert(Inventory.count(0, 'flour') == nil and Inventory.count(42, 'bad item') == nil)
 plan.ingredients[2] = { item = 'flour', quantity = 1 }
 assert(Inventory.inspectPlan(42, plan) == nil)
+for _, ingredients in ipairs({
+    { [1] = { item = 'flour', quantity = 1 }, [3] = { item = 'water', quantity = 1 } },
+    { [1] = { item = 'flour', quantity = 1 }, hidden = { item = 'water', quantity = 1 } },
+    { { item = 'flour', quantity = 1 }, { item = 'water', quantity = -1 } },
+}) do
+    throws = true -- Invalid plans must fail before calling any provider export.
+    local value, errorCode = Inventory.inspectPlan(42, { outputItem = 'bread', ingredients = ingredients })
+    assert(value == nil and errorCode == 'invalid_plan')
+end
+throws = false
 FoodBusiness.Inventory.resource = 'invalid/resource'
 assert(not Inventory.capabilities().configured)
 print('inventory adapter and read-only availability contracts passed')

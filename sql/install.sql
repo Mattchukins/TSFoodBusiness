@@ -1,4 +1,4 @@
--- TSFoodBusiness install / additive upgrade to schema 5.
+-- TSFoodBusiness install / additive upgrade to schema 6.
 -- Stop the resource and back up the selected oxmysql database before import.
 -- Existing rows are preserved. CREATE IF NOT EXISTS does not repair incompatible
 -- columns, engines or indexes; the runtime metadata gate still checks those.
@@ -58,5 +58,32 @@ CREATE TABLE IF NOT EXISTS tsfb_production_profiles (
  FOREIGN KEY (recipe_id) REFERENCES tsfb_recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+-- Jobs keep immutable recipe/station IDs and plans after configuration deletion.
+-- Terminal slots are NULL so completed history does not block new production.
+CREATE TABLE IF NOT EXISTS tsfb_cooking_jobs (
+ id VARCHAR(36) NOT NULL PRIMARY KEY,
+ business_id VARCHAR(36) NOT NULL,
+ actor_id VARCHAR(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+ recipe_id VARCHAR(36) NOT NULL,
+ station_id VARCHAR(36) NOT NULL,
+ request_token VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ batches INT UNSIGNED NOT NULL,
+ plan_json LONGTEXT NOT NULL,
+ plan_key VARCHAR(1600) NOT NULL,
+ provider_resource VARCHAR(80) NOT NULL,
+ state VARCHAR(24) NOT NULL,
+ revision INT UNSIGNED NOT NULL DEFAULT 0,
+ ready_at BIGINT UNSIGNED NOT NULL DEFAULT 0,
+ station_slot VARCHAR(36) NULL,
+ actor_slot VARCHAR(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL,
+ created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ UNIQUE KEY job_request (actor_id, request_token),
+ UNIQUE KEY active_station (station_slot),
+ UNIQUE KEY active_actor (actor_slot),
+ KEY business_jobs (business_id, actor_id, created_at),
+ FOREIGN KEY (business_id) REFERENCES tsfb_businesses(id)
+) ENGINE=InnoDB;
+
 -- Record all supported versions only after every table statement succeeds.
-INSERT IGNORE INTO tsfb_schema (version) VALUES (1), (2), (3), (4), (5);
+INSERT IGNORE INTO tsfb_schema (version) VALUES (1), (2), (3), (4), (5), (6);

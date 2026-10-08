@@ -39,3 +39,5 @@ Recipe and supplier catalog mutations, including recipe name/price editing and d
 See [later phase progress](LATER_PHASE_PROGRESS.md) for the status of all eight phases.
 
 Production-profile configuration added on 2026-10-08: Lua syntax, mocked production validation/ownership/read/transaction-failure tests and React TypeScript/Vite checks pass locally. Schema version 5 migration, foreign-key cascade, persistence/restart and rollback require live database verification. Inventory item existence, consumption, cooking completion and multi-framework behavior remain unverified and disabled.
+
+Schema 6 cooking jobs and the custom atomic mutation contract are locally implemented. The kitchen remains disabled by default. Live SQL upgrade, constraint/rollback behaviour, provider conservation/replay/recovery, disconnects, clock stability and each framework must be verified before enabling. React job controls compile but interactive FiveM QA remains pending.

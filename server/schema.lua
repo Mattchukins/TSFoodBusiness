@@ -7,6 +7,7 @@ Schema.required = {
     tsfb_suppliers = { 'id', 'business_id', 'name', 'item_name', 'unit_price_cents', 'created_at' },
     tsfb_operations = { 'business_id', 'opens_minute', 'closes_minute', 'seat_capacity', 'queue_capacity', 'updated_at' },
     tsfb_production_profiles = { 'recipe_id', 'station_type', 'output_item', 'output_quantity', 'duration_seconds', 'updated_at' },
+    tsfb_cooking_jobs = { 'id', 'business_id', 'actor_id', 'recipe_id', 'station_id', 'request_token', 'batches', 'plan_json', 'plan_key', 'provider_resource', 'state', 'revision', 'ready_at', 'station_slot', 'actor_slot', 'created_at', 'updated_at' },
     tsfb_stations = { 'id', 'business_id', 'name', 'type', 'x', 'y', 'z', 'heading', 'routing_bucket', 'created_at' },
 }
 
@@ -29,14 +30,14 @@ end
 
 function Schema.verify()
     local ok, rows = pcall(function()
-        return MySQL.query.await("SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles')")
+        return MySQL.query.await("SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs')")
     end)
     if not ok then return false, 'schema metadata query failed' end
     local valid, reason = Schema.checkColumns(rows)
     if not valid then return false, reason end
     local metadataOk, tables, indexes = pcall(function()
-        local engines = MySQL.query.await("SELECT TABLE_NAME AS table_name, ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles')")
-        local keys = MySQL.query.await("SELECT TABLE_NAME AS table_name, INDEX_NAME AS index_name, NON_UNIQUE AS non_unique, COLUMN_NAME AS column_name, SUB_PART AS sub_part FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles')")
+        local engines = MySQL.query.await("SELECT TABLE_NAME AS table_name, ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs')")
+        local keys = MySQL.query.await("SELECT TABLE_NAME AS table_name, INDEX_NAME AS index_name, NON_UNIQUE AS non_unique, COLUMN_NAME AS column_name, SUB_PART AS sub_part FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs')")
         return engines, keys
     end)
     if not metadataOk then return false, 'schema integrity query failed' end
@@ -66,9 +67,25 @@ function Schema.checkIntegrity(tables, indexes)
         local column = name == 'tsfb_schema' and 'version' or name == 'tsfb_operations' and 'business_id' or name == 'tsfb_production_profiles' and 'recipe_id' or 'id'
         if not uniqueColumn(name, 'PRIMARY', column) then return false, 'invalid primary key: ' .. name end
     end
+    local auditUnique = false
     for name in pairs(keys) do
         local prefix = 'tsfb_audit.'
-        if name:sub(1, #prefix) == prefix and uniqueColumn('tsfb_audit', name:sub(#prefix + 1), 'correlation_id') then return true end
+        if name:sub(1, #prefix) == prefix and uniqueColumn('tsfb_audit', name:sub(#prefix + 1), 'correlation_id') then auditUnique = true end
     end
-    return false, 'unique audit correlation key required'
+    if not auditUnique then return false, 'unique audit correlation key required' end
+    local function uniqueColumns(indexName, expected)
+        local entries = keys['tsfb_cooking_jobs.' .. indexName]
+        if not entries or #entries ~= #expected then return false end
+        local found = {}
+        for _, entry in ipairs(entries) do
+            if tonumber(entry.non_unique) ~= 0 or entry.sub_part ~= nil then return false end
+            found[entry.column_name] = true
+        end
+        for _, column in ipairs(expected) do if not found[column] then return false end end
+        return true
+    end
+    for name, columns in pairs({ job_request = { 'actor_id', 'request_token' }, active_station = { 'station_slot' }, active_actor = { 'actor_slot' } }) do
+        if not uniqueColumns(name, columns) then return false, 'unique cooking key required: ' .. name end
+    end
+    return true
 end

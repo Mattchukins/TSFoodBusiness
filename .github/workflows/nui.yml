@@ -18,6 +18,9 @@ jobs:
       - run: lua5.4 tests/stations.lua
       - run: lua5.4 tests/production.lua
       - run: lua5.4 tests/inventory.lua
+      - run: lua5.4 tests/jobs.lua
+      - run: lua5.4 tests/jobs_requests.lua
+      - run: lua5.4 tests/inventory_mutations.lua
       - run: python3 tests/sql_contract.py
   nui:
     runs-on: ubuntu-latest

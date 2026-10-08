@@ -26,6 +26,13 @@ correlation.sub_part = 20
 assert(not Schema.verify())
 correlation.sub_part = nil
 assert(Schema.verify())
+for _, entry in ipairs(fixture.indexes) do
+    if entry.table_name == 'tsfb_cooking_jobs' and entry.index_name == 'active_station' then
+        entry.non_unique = 1; assert(not Schema.verify()); entry.non_unique = 0
+        entry.sub_part = 20; assert(not Schema.verify()); entry.sub_part = nil
+    end
+end
+assert(Schema.verify())
 MySQL.query.await = function() error('unavailable database') end
 assert(not Schema.verify())
 assert(not Schema.checkColumns(nil))

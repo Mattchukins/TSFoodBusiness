@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import './style.css'
+import { KitchenJobs, type CookingResponse } from './components/KitchenJobs'
 import { ProductionEditor } from './components/ProductionEditor'
 import { Panel } from './components/Panel'
 import { StationCard, type Station } from './components/StationCard'
@@ -20,7 +21,7 @@ type Recipe = { id: string; name: string; price_cents: number; ingredients: Ingr
 type Supplier = { id: string; name: string; item_name: string; unit_price_cents: number }
 type Operations = { opens_minute: number; closes_minute: number; seat_capacity: number; queue_capacity: number }
 type AuditEntry = { action: string; details: string; created_at: string | number }
-type Result = { productionProfile?: { station_type: string; output_item: string; output_quantity: number; duration_seconds: number } | null; ok: boolean; error?: string; businesses?: Business[]; presets?: Preset[]; stationTypes?: string[]; recipes?: Recipe[]; suppliers?: Supplier[]; quote?: Recipe; operations?: Operations | null; audit?: AuditEntry[]; stations?: Station[] }
+type Result = CookingResponse & { stockReport?: { available: boolean; ingredients: { item: string; required: number; available: number; missing: number }[] }; productionPlan?: { ingredients: Ingredient[]; outputItem: string; outputQuantity: number; durationSeconds: number; stationType: string; batches: number }; productionProfile?: { station_type: string; output_item: string; output_quantity: number; duration_seconds: number } | null; ok: boolean; error?: string; businesses?: Business[]; presets?: Preset[]; stationTypes?: string[]; recipes?: Recipe[]; suppliers?: Supplier[]; quote?: Recipe; operations?: Operations | null; audit?: AuditEntry[]; stations?: Station[] }
 async function request(action: string, payload: Record<string, unknown>): Promise<Result> {
   const name = (window as Window & { GetParentResourceName?: () => string }).GetParentResourceName?.()
   if (!name) return { ok: false, error: 'FiveM resource unavailable' }
@@ -357,11 +358,12 @@ function App() {
               <button type="submit" disabled={busy || loadedOperationsBusiness !== selectedBusiness}>Save operating profile</button></form>}
             <p role="status" aria-live="polite">{message}</p></Panel>
           : page === 'kitchen' || page === 'suppliers' ? <Panel>
-            <p>Catalog setup only. Cooking, inventory purchasing and payment are disabled.</p>
+            <p>Configure recipes and suppliers. Cooking requires a verified inventory adapter; purchasing and payments remain disabled.</p>
             <label>Business<select disabled={busy} value={selectedBusiness} onChange={event => { setSelectedBusiness(event.target.value); setEditingRecipe(''); setEditingSupplier(''); setEntryName(''); setItemName(''); setEntryPrice('') }}><option value="">Select a business</option>{businesses.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
             {selectedBusiness && <><ul>{page === 'kitchen'
               ? recipes.map(r => <li key={r.id}>{r.name} · {r.price_cents} cents <button type="button" disabled={busy} onClick={() => setProductionRecipe(r)}>Production settings</button> <button disabled={busy} type="button" onClick={() => { setEditingRecipe(r.id); setEntryName(r.name); setEntryPrice(String(r.price_cents)); setIngredients(r.ingredients.map(entry => ({ ...entry }))) }}>Edit</button> <button disabled={busy} type="button" onClick={() => void deleteRecipe(r.id)}>Delete</button></li>)
               : suppliers.map(s => <li key={s.id}>{s.name}: {s.item_name} · {s.unit_price_cents} cents each <button disabled={busy} type="button" onClick={() => { setEditingSupplier(s.id); setEntryName(s.name); setItemName(s.item_name); setEntryPrice(String(s.unit_price_cents)) }}>Edit</button> <button disabled={busy} type="button" onClick={() => void deleteSupplier(s.id)}>Delete</button></li>)}</ul>
+              {page === 'kitchen' && <KitchenJobs key={selectedBusiness} businessId={selectedBusiness} recipes={recipes} request={request} busy={busy} onBusy={setBusy} />}
               {page === 'kitchen' && productionRecipe && <ProductionEditor key={`${selectedBusiness}:${productionRecipe.id}`} businessId={selectedBusiness} recipe={productionRecipe} request={request} busy={busy} onBusy={setBusy} onClose={() => setProductionRecipe(null)} />}
               <form onSubmit={event => void createCatalogEntry(event)}>
                 <label>{page === 'kitchen' ? 'Recipe name' : 'Supplier name'}<input required minLength={2} maxLength={80} value={entryName} onChange={event => setEntryName(event.target.value)}/></label>
