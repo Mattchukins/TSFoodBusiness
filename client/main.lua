@@ -22,7 +22,7 @@ end)
 RegisterNUICallback('request', function(data, cb)
     if type(data) ~= 'table' or type(data.action) ~= 'string' or type(data.payload) ~= 'table'
         or (data.action ~= 'listBusinesses' and data.action ~= 'listPresets' and data.action ~= 'listStationTypes'
-            and data.action ~= 'listStaffRoles' and data.action ~= 'listStaff'
+            and data.action ~= 'listMyStaffBusinesses' and data.action ~= 'setMyStaffDuty' and data.action ~= 'listStaffShifts' and data.action ~= 'listStaffRoles' and data.action ~= 'listStaff'
             and data.action ~= 'setStaffDuty' and data.action ~= 'assignStaffMember' and data.action ~= 'updateStaffMember' and data.action ~= 'removeStaffMember'
             and data.action ~= 'listCookingJobs' and data.action ~= 'startCookingJob'
             and data.action ~= 'finishCookingJob' and data.action ~= 'cancelCookingJob'

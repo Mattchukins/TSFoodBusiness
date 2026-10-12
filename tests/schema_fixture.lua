@@ -11,5 +11,6 @@ end
 for _, column in ipairs({ 'business_id', 'member_id' }) do
     fixture.indexes[#fixture.indexes + 1] = { table_name = 'tsfb_staff', index_name = 'business_member', non_unique = 0, column_name = column }
 end
+fixture.indexes[#fixture.indexes + 1] = { table_name = 'tsfb_staff_shifts', index_name = 'active_staff', non_unique = 0, column_name = 'staff_slot' }
 fixture.indexes[#fixture.indexes + 1] = { table_name = 'tsfb_audit', index_name = 'correlation_id', non_unique = 0, column_name = 'correlation_id' }
 return fixture

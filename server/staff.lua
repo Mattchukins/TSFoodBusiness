@@ -37,12 +37,30 @@ function Staff.permission(src, businessId, permission)
 end
 function Staff.handle(src, actor, action, data)
     if not FoodBusiness.Modules.staff then return { ok = false, error = 'staff_disabled' } end
+    if action == 'listMyStaffBusinesses' then
+        if next(data) ~= nil then return { ok = false, error = 'invalid_payload' } end
+        local rows = MySQL.query.await('SELECT b.id, b.name, s.role, COALESCE(d.on_duty, 0) AS on_duty, COALESCE(d.revision, 0) AS duty_revision FROM tsfb_staff s JOIN tsfb_businesses b ON b.id = s.business_id LEFT JOIN tsfb_staff_duty d ON d.staff_id = s.id WHERE s.member_id = ? ORDER BY b.name, b.id LIMIT 100', { actor })
+        local current = Framework.player(src)
+        if not current or current.id ~= actor then return { ok = false, error = 'identity_unavailable' } end
+        return { ok = true, staffBusinesses = rows }
+    end
+    local selfDuty = action == 'setMyStaffDuty'
+    if selfDuty then
+        if not exact(data, { businessId = true, revision = true, onDuty = true }) or not FoodBusiness.validJobId(data.businessId)
+            or type(data.onDuty) ~= 'boolean' or not integer(data.revision, 0, 2147483646) then return { ok = false, error = 'invalid_payload' } end
+        local current = Framework.player(src)
+        if not current or current.id ~= actor then return { ok = false, error = 'identity_unavailable' } end
+        local member = MySQL.single.await('SELECT id FROM tsfb_staff WHERE business_id = ? AND member_id = ?', { data.businessId, actor })
+        if not member then return { ok = false, error = 'forbidden' } end
+        data = { businessId = data.businessId, staffId = member.id, revision = data.revision, onDuty = data.onDuty }
+        action = 'setStaffDuty'
+    end
     if action == 'listStaffRoles' then
         if next(data) ~= nil then return { ok = false, error = 'invalid_payload' } end
         return { ok = true, staffRoles = FoodBusiness.listStaffRoles() }
     end
     if not FoodBusiness.validJobId(data.businessId) then return { ok = false, error = 'invalid_payload' } end
-    local keys = action == 'listStaff' and { businessId = true }
+    local keys = (action == 'listStaff' or action == 'listStaffShifts') and { businessId = true }
         or action == 'assignStaffMember' and { businessId = true, targetSource = true, displayName = true, role = true }
         or action == 'updateStaffMember' and { businessId = true, staffId = true, revision = true, displayName = true, role = true }
         or action == 'setStaffDuty' and { businessId = true, staffId = true, revision = true, onDuty = true }
@@ -56,24 +74,40 @@ function Staff.handle(src, actor, action, data)
             (not FoodBusiness.validJobId(data.staffId) or not integer(data.revision, 0, 2147483646))) then
         return { ok = false, error = 'invalid_payload' }
     end
-    if not owns(src, actor, data.businessId) then return { ok = false, error = 'forbidden' } end
+    if not selfDuty and not owns(src, actor, data.businessId) then return { ok = false, error = 'forbidden' } end
     if action == 'listStaff' then
         return { ok = true, staff = MySQL.query.await('SELECT s.id, s.display_name, s.role, s.revision, COALESCE(d.on_duty, 0) AS on_duty, COALESCE(d.revision, 0) AS duty_revision FROM tsfb_staff s LEFT JOIN tsfb_staff_duty d ON d.staff_id = s.id WHERE s.business_id = ? ORDER BY s.display_name, s.id LIMIT 200', { data.businessId }) }
+    end
+    if action == 'listStaffShifts' then
+        return { ok = true, shifts = MySQL.query.await('SELECT id, staff_label, role, started_at, ended_at, end_reason, GREATEST(0, (CASE WHEN ended_at = 0 THEN ? ELSE ended_at END) - started_at) AS duration_seconds FROM tsfb_staff_shifts WHERE business_id = ? ORDER BY started_at DESC, id DESC LIMIT 100', { os.time(), data.businessId }) }
     end
     if action == 'setStaffDuty' then
         local member = MySQL.single.await('SELECT id FROM tsfb_staff WHERE id = ? AND business_id = ?', { data.staffId, data.businessId })
         if not member then return { ok = false, error = 'not_found' } end
         local duty = MySQL.single.await('SELECT on_duty, revision FROM tsfb_staff_duty WHERE staff_id = ?', { data.staffId })
         if (duty and tonumber(duty.revision) or 0) ~= data.revision then return { ok = false, error = 'staff_conflict' } end
+        local open = MySQL.single.await('SELECT id FROM tsfb_staff_shifts WHERE staff_slot = ?', { data.staffId })
+        if (duty and tonumber(duty.on_duty) == 1 or false) == data.onDuty and ((data.onDuty and open) or (not data.onDuty and not open)) then return { ok = true } end
+        local now = os.time()
+        if not integer(now, 1, 2147483647) then return { ok = false, error = 'clock_unavailable' } end
+        local shiftId = data.onDuty and MySQL.scalar.await('SELECT UUID()') or nil
+        if data.onDuty and not FoodBusiness.validJobId(shiftId) then return { ok = false, error = 'database_error' } end
         local revision = data.revision + 1
         local mutation = duty
-            and { query = 'UPDATE tsfb_staff_duty SET on_duty = ?, revision = revision + 1 WHERE staff_id = ? AND revision = ? AND EXISTS (SELECT 1 FROM tsfb_staff s JOIN tsfb_businesses b ON b.id = s.business_id WHERE s.id = ? AND b.id = ? AND b.owner_id = ?)',
-                values = { data.onDuty and 1 or 0, data.staffId, data.revision, data.staffId, data.businessId, actor } }
-            or { query = 'INSERT INTO tsfb_staff_duty (staff_id, on_duty, revision) SELECT s.id, ?, 1 FROM tsfb_staff s JOIN tsfb_businesses b ON b.id = s.business_id WHERE s.id = ? AND b.id = ? AND b.owner_id = ?',
-                values = { data.onDuty and 1 or 0, data.staffId, data.businessId, actor } }
+            and { query = 'UPDATE tsfb_staff_duty SET on_duty = ?, revision = revision + 1 WHERE staff_id = ? AND revision = ? AND EXISTS (SELECT 1 FROM tsfb_staff s JOIN tsfb_businesses b ON b.id = s.business_id WHERE s.id = ? AND b.id = ? AND (b.owner_id = ? OR s.member_id = ?))',
+                values = { data.onDuty and 1 or 0, data.staffId, data.revision, data.staffId, data.businessId, actor, actor } }
+            or { query = 'INSERT INTO tsfb_staff_duty (staff_id, on_duty, revision) SELECT s.id, ?, 1 FROM tsfb_staff s JOIN tsfb_businesses b ON b.id = s.business_id WHERE s.id = ? AND b.id = ? AND (b.owner_id = ? OR s.member_id = ?)',
+                values = { data.onDuty and 1 or 0, data.staffId, data.businessId, actor, actor } }
+        local current = Framework.player(src)
+        if not current or current.id ~= actor then return { ok = false, error = 'identity_unavailable' } end
+        local shiftMutation = data.onDuty
+            and { query = 'INSERT INTO tsfb_staff_shifts (id, business_id, staff_id, staff_label, role, started_at, ended_at, end_reason, staff_slot) SELECT ?, s.business_id, s.id, s.display_name, s.role, ?, 0, ?, s.id FROM tsfb_staff s JOIN tsfb_staff_duty d ON d.staff_id = s.id WHERE s.id = ? AND d.revision = ? AND d.on_duty = 1',
+                values = { shiftId, now, '', data.staffId, revision } }
+            or { query = 'UPDATE tsfb_staff_shifts SET ended_at = GREATEST(started_at, ?), end_reason = ?, staff_slot = NULL WHERE staff_slot = ? AND EXISTS (SELECT 1 FROM tsfb_staff_duty WHERE staff_id = ? AND revision = ? AND on_duty = 0)',
+                values = { now, 'duty_off', data.staffId, data.staffId, revision } }
         local ok, done = pcall(function() return MySQL.transaction.await({ mutation,
             { query = 'INSERT INTO tsfb_audit (action, actor_id, business_id, correlation_id, details) SELECT ?, ?, s.business_id, ?, ? FROM tsfb_staff_duty d JOIN tsfb_staff s ON s.id = d.staff_id WHERE d.staff_id = ? AND d.revision = ?',
-                values = { 'staff.duty', actor, 'duty:' .. data.staffId .. ':' .. revision, json.encode({ staffId = data.staffId, onDuty = data.onDuty }), data.staffId, revision } },
+                values = { 'staff.duty', actor, 'duty:' .. data.staffId .. ':' .. revision, json.encode({ staffId = data.staffId, onDuty = data.onDuty }), data.staffId, revision } }, shiftMutation,
         }) end)
         if not ok or not done then return { ok = false, error = 'transaction_failed' } end
         local saved = MySQL.single.await('SELECT on_duty, revision FROM tsfb_staff_duty WHERE staff_id = ?', { data.staffId })
@@ -116,6 +150,10 @@ function Staff.handle(src, actor, action, data)
             values = { removing and 'staff.remove' or 'staff.update', actor, 'staff:' .. data.staffId .. ':' .. revision,
                 json.encode({ staffId = data.staffId, revision = revision, displayName = data.displayName, role = data.role }), data.staffId, data.businessId, revision } },
     }
+    if removing then
+        statements[#statements + 1] = { query = 'UPDATE tsfb_staff_shifts SET ended_at = GREATEST(started_at, ?), end_reason = ?, staff_slot = NULL WHERE staff_slot = ? AND EXISTS (SELECT 1 FROM tsfb_staff WHERE id = ? AND business_id = ? AND revision = ?)',
+            values = { os.time(), 'staff_removed', data.staffId, data.staffId, data.businessId, revision } }
+    end
     if removing then statements[#statements + 1] = { query = 'DELETE FROM tsfb_staff WHERE id = ? AND business_id = ? AND revision = ?', values = { data.staffId, data.businessId, revision } } end
     local ok, done = pcall(function() return MySQL.transaction.await(statements) end)
     if not ok or not done then return { ok = false, error = 'transaction_failed' } end

@@ -63,7 +63,8 @@ MySQL = {
             if row and row.revision == event.values[7] then
                 assert(not audit[event.values[3]]); audit[event.values[3]] = true
             end
-            if value[3] and row and row.revision == value[3].values[3] then rows[id] = nil end
+            local deletion = value[#value]
+            if deletion.query:find('DELETE FROM tsfb_staff', 1, true) and row and row.revision == deletion.values[3] then rows[id] = nil end
         end
         return true
     end },
@@ -116,21 +117,38 @@ ownerChange = false; owned = true
 assert(send('removeStaffMember', { businessId = business, staffId = id, revision = 0 }).error == 'staff_conflict')
 players[55] = nil -- An owner can remove offline staff by roster entry, never by source ID.
 assert(send('removeStaffMember', { businessId = business, staffId = id, revision = 1 }).ok and rows[id] == nil)
-assert(audit['staff:' .. id .. ':2'] and #statements == 3)
+assert(audit['staff:' .. id .. ':2'] and #statements == 4)
 players[55] = { id = 'staff-55' }
 assert(Staff.permission(55, business, 'cook') == nil)
 local rehire = assign(); assert(rehire.ok)
-local dutyRow = nil
+local dutyRow, shifts = nil, {}
+local oldTime = os.time
+local clock = 1000
+os.time = function() return clock end
 local singleOriginal, transactionOriginal = MySQL.single.await, MySQL.transaction.await
 MySQL.single.await = function(query, values)
+    if query:find('FROM tsfb_staff_shifts', 1, true) then
+        for _, shift in pairs(shifts) do if shift.staff_slot == values[1] then return clone(shift) end end
+        return nil
+    end
     if query:find('FROM tsfb_staff_duty', 1, true) then assert(values[1] == rehire.staffId); return clone(dutyRow) end
     return singleOriginal(query, values)
 end
 MySQL.transaction.await = function(value)
-    if not value[1].query:find('tsfb_staff_duty', 1, true) then return transactionOriginal(value) end
+    if not value[1].query:find('tsfb_staff_duty', 1, true) then
+        local result = transactionOriginal(value)
+        local last = value[#value]
+        if result and last.query:find('DELETE FROM tsfb_staff', 1, true) and rows[last.values[1]] == nil then
+            local closing = value[#value - 1].values
+            for _, shift in pairs(shifts) do if shift.staff_slot == closing[3] then
+                shift.ended_at = math.max(shift.started_at, closing[1]); shift.end_reason = closing[2]; shift.staff_slot = nil
+            end end
+        end
+        return result
+    end
     if fail then return false end
     local v = value[1].values
-    if owned then
+    if owned or rows[rehire.staffId].member_id == v[#v] then
         if value[1].query:find('INSERT', 1, true) then
             if dutyRow then return false end
             dutyRow = { on_duty = v[1], revision = 1 }
@@ -141,7 +159,33 @@ MySQL.transaction.await = function(value)
     if dutyRow and dutyRow.revision == value[2].values[6] then
         assert(not audit[value[2].values[3]]); audit[value[2].values[3]] = true
     end
+    local shiftChange = value[3]
+    local sv = shiftChange.values
+    if dutyRow and dutyRow.revision == value[2].values[6] then
+        if shiftChange.query:find('INSERT', 1, true) then
+            for _, shift in pairs(shifts) do assert(shift.staff_slot ~= rehire.staffId) end
+            shifts[sv[1]] = { id = sv[1], staff_slot = sv[4], started_at = sv[2], ended_at = 0, staff_label = rows[rehire.staffId].display_name }
+        else
+            for _, shift in pairs(shifts) do if shift.staff_slot == sv[3] then
+                shift.ended_at = math.max(shift.started_at, sv[1]); shift.end_reason = sv[2]; shift.staff_slot = nil
+            end end
+        end
+    end
     return true
+end
+local queryOriginal = MySQL.query.await
+MySQL.query.await = function(query, values)
+    if query:find('FROM tsfb_staff_shifts', 1, true) then
+        assert(values[2] == business)
+        local out = {}; for _, shift in pairs(shifts) do out[#out + 1] = clone(shift) end; return out
+    elseif query:find('WHERE s.member_id', 1, true) then
+        local out = {}
+        for _, member in pairs(rows) do if member.member_id == values[1] then
+            out[#out + 1] = { id = member.business_id, name = 'Test business', role = member.role, on_duty = dutyRow and dutyRow.on_duty or 0, duty_revision = dutyRow and dutyRow.revision or 0 }
+        end end
+        return out
+    end
+    return queryOriginal(query, values)
 end
 local dutyPayload = { businessId = business, staffId = rehire.staffId, revision = 0, onDuty = true }
 assert(send('setStaffDuty', dutyPayload, 55).error == 'forbidden' and dutyRow == nil)
@@ -155,6 +199,35 @@ assert(send('setStaffDuty', dutyPayload).error == 'staff_conflict' and dutyRow.r
 dutyPayload.revision = 1; dutyPayload.onDuty = false
 assert(send('setStaffDuty', dutyPayload).ok and dutyRow.on_duty == 0 and dutyRow.revision == 2)
 assert(audit['duty:' .. rehire.staffId .. ':2'])
+assert(#send('listMyStaffBusinesses', {}, 55).staffBusinesses == 1)
+assert(#send('listMyStaffBusinesses', {}, 42).staffBusinesses == 0)
+assert(send('listMyStaffBusinesses', { member_id = 'owner-42' }, 55).error == 'invalid_payload')
+assert(send('listStaffShifts', { businessId = business }, 55).error == 'forbidden')
+local historyCount = 0; for _, shift in pairs(shifts) do historyCount = historyCount + 1; assert(shift.started_at == 1000 and shift.ended_at == 1000 and shift.staff_slot == nil) end
+assert(historyCount == 1)
+assert(send('setMyStaffDuty', { businessId = business, revision = 2, onDuty = true, staffId = rehire.staffId }, 55).error == 'invalid_payload')
+assert(send('setMyStaffDuty', { businessId = business, revision = 2, onDuty = true }, 42).error == 'forbidden')
+owned = false; clock = 1100
+assert(send('setMyStaffDuty', { businessId = business, revision = 2, onDuty = true }, 55).ok)
+assert(dutyRow.on_duty == 1 and dutyRow.revision == 3)
+clock = 1200
+assert(send('setMyStaffDuty', { businessId = business, revision = 3, onDuty = false }, 55).ok)
+assert(dutyRow.on_duty == 0 and dutyRow.revision == 4)
+local second = 0; for _, shift in pairs(shifts) do if shift.started_at == 1100 then second = second + 1; assert(shift.ended_at == 1200) end end
+assert(second == 1)
+owned = true
+assert(#send('listStaffShifts', { businessId = business }).shifts == 2)
+clock = 1300
+assert(send('setMyStaffDuty', { businessId = business, revision = 4, onDuty = true }, 55).ok)
+clock = 1400
+assert(send('removeStaffMember', { businessId = business, staffId = rehire.staffId, revision = 0 }).ok)
+local removedShift = 0
+for _, shift in pairs(shifts) do if shift.started_at == 1300 then
+    removedShift = removedShift + 1; assert(shift.ended_at == 1400 and shift.end_reason == 'staff_removed' and shift.staff_slot == nil and shift.staff_label == 'Kitchen staff')
+end end
+assert(removedShift == 1 and #send('listStaffShifts', { businessId = business }).shifts == 3)
+assert(#send('listMyStaffBusinesses', {}, 55).staffBusinesses == 0)
+os.time = oldTime
 FoodBusiness.Modules.staff = false
 assert(send('listStaff', { businessId = business }).error == 'staff_disabled')
 assert(Staff.role(42, business) == nil)

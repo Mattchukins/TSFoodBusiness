@@ -37,6 +37,11 @@ for _, entry in ipairs(fixture.indexes) do
         entry.non_unique = 1; assert(not Schema.verify()); entry.non_unique = 0
     end
 end
+for _, entry in ipairs(fixture.indexes) do
+    if entry.table_name == 'tsfb_staff_shifts' then
+        entry.sub_part = 10; assert(not Schema.verify()); entry.sub_part = nil
+    end
+end
 assert(Schema.verify())
 MySQL.query.await = function() error('unavailable database') end
 assert(not Schema.verify())

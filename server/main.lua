@@ -67,7 +67,7 @@ local function handleRequest(src, request)
     if not person or not validText(person.id, 80) then
         respond(src, request.requestId, { ok = false, error = 'identity_unavailable' }); return
     end
-    if request.action == 'listStaffRoles' or request.action == 'listStaff' or request.action == 'assignStaffMember'
+    if request.action == 'listMyStaffBusinesses' or request.action == 'setMyStaffDuty' or request.action == 'listStaffShifts' or request.action == 'listStaffRoles' or request.action == 'listStaff' or request.action == 'assignStaffMember'
         or request.action == 'setStaffDuty' or request.action == 'updateStaffMember' or request.action == 'removeStaffMember' then
         respond(src, request.requestId, Staff.handle(src, person.id, request.action, request.data)); return
     end

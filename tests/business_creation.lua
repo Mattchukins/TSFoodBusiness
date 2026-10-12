@@ -1,4 +1,4 @@
-FoodBusiness = { Version = 'test', RequiredSchema = 8, Modules = { businesses = true, operations = true, recipes = true } }
+FoodBusiness = { Version = 'test', RequiredSchema = 9, Modules = { businesses = true, operations = true, recipes = true } }
 dofile('shared/presets.lua')
 dofile('shared/recipes.lua')
 dofile('server/schema.lua')
@@ -13,7 +13,7 @@ MySQL = {
         if query:find('information_schema.STATISTICS', 1, true) then return fixture.indexes end
         return fixture.columns
     end },
-    single = { await = function() return { count = 8, minimum = 1, maximum = 8 } end },
+    single = { await = function() return { count = 9, minimum = 1, maximum = 9 } end },
     scalar = { await = function() return '12345678-1234-1234-1234-123456789abc' end },
     transaction = { await = function(items) statements = items; return true end },
 }
@@ -103,7 +103,7 @@ handler({ requestId = 'audit-2', action = 'listAudit', data = { businessId = bus
 assert(response.ok and #response.audit == 1 and response.audit[1].action == 'recipe.update')
 print('audit ownership and query scope contract passed')
 
-MySQL.single.await = function() return { count = 8, minimum = 1, maximum = 8 } end
+MySQL.single.await = function() return { count = 9, minimum = 1, maximum = 9 } end
 MySQL.query.await = function() return {} end
 response, statements = nil, nil
 dofile('server/main.lua')

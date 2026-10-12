@@ -45,3 +45,5 @@ Schema 6 cooking jobs and the custom atomic mutation contract are locally implem
 Schema 7 staff roster is locally implemented with owner-only assignment/edit/removal, server-resolved online target identities, stale revision guards and transactional audit. Permission exports revalidate source identities after awaited reads; cooking and management delegation remain pending. Live persistence, concurrent edits, source recycling and framework character switching need verification.
 
 Schema 8 manual staff duty flags compile and pass mocked owner/payload/revision/failure checks. Live SQL installation, duty persistence, audit rollback and membership-delete cascade remain pending. This is not shift or payroll tracking.
+
+Schema 9 self-service duty and shift history require live atomic-write, active-slot concurrency, removal-close/history retention and framework identity-switch tests. Automatic disconnect clock-out remains unimplemented.

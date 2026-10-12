@@ -16,7 +16,7 @@ local timer = 0
 GetGameTimer = function() return timer end
 MySQL = {
     single = { await = function(query, values)
-        if query:find('tsfb_schema', 1, true) then return { count = 8, minimum = 1, maximum = 8 } end
+        if query:find('tsfb_schema', 1, true) then return { count = 9, minimum = 1, maximum = 9 } end
         if query:find('owner_id', 1, true) then assert(values[1] == id and values[2] == 'owner-42'); return { id = id } end
     end },
     query = { await = function(query)
@@ -63,8 +63,8 @@ assert(response.error == 'identity_unavailable' and calls == before)
 person = { id = 'owner-42' }
 assert(dependencies.owner(42, 'owner-42', id))
 assert(not dependencies.owner(42, 'other-owner', id))
-for _, action in ipairs({ 'listStaffRoles', 'listStaff', 'assignStaffMember', 'updateStaffMember', 'removeStaffMember', 'setStaffDuty' }) do
+for _, action in ipairs({ 'listStaffRoles', 'listStaff', 'assignStaffMember', 'updateStaffMember', 'removeStaffMember', 'setStaffDuty', 'listStaffShifts', 'setMyStaffDuty', 'listMyStaffBusinesses' }) do
     send(action, {}); assert(response.ok and response.action == action)
 end
-assert(staffCalls == 6)
+assert(staffCalls == 9)
 print('cooking and staff NUI action routing, exact payloads and server-derived identity passed (mocked)')

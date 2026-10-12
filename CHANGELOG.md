@@ -85,3 +85,10 @@
 - Added owner-managed on/off-duty status in the React/Tailwind roster, using separate revision checks and transactional audit.
 - Added a staff-linked duty table to the existing install/uninstall SQL pair; staff deletion cascades its current duty status.
 - Status persists until changed; self-service clocking, shift durations, disconnect clock-out and payroll remain pending. Local mocked checks pass; live persistence/rollback remains unverified.
+
+### Self-service duty and shift history — schema 9
+
+- Added My duty in React/Tailwind, listing the current character's staff businesses and allowing only their own duty changes.
+- Added server-timed shift snapshots and owner-scoped recent history in the Staff roster. Duty, shift and audit writes are transactional with one active shift per staff entry.
+- Staff removal closes an active shift and preserves historical label/role snapshots. No fabricated start times are added to older duty flags.
+- Disconnect clock-out, payroll and gameplay delegation remain pending. Local tests/build pass; live MySQL/FiveM verification remains pending.
