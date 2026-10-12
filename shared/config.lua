@@ -1,7 +1,7 @@
 FoodBusiness = FoodBusiness or {}
 FoodBusiness.Version = '0.8.0-dev'
 FoodBusiness.Framework = 'auto' -- esx, qbcore, qbox or auto
-FoodBusiness.RequiredSchema = 7
+FoodBusiness.RequiredSchema = 8
 FoodBusiness.Modules = {
     businesses = true,
     recipes = true,

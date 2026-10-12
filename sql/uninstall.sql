@@ -1,6 +1,7 @@
 -- TSFoodBusiness destructive uninstall. Stop the resource and back up first.
 -- Permanently deletes all TSFoodBusiness records, including audit history.
 -- Child tables precede parent tables; foreign-key checking stays enabled.
+DROP TABLE IF EXISTS tsfb_staff_duty;
 DROP TABLE IF EXISTS tsfb_staff;
 DROP TABLE IF EXISTS tsfb_cooking_jobs;
 DROP TABLE IF EXISTS tsfb_production_profiles;

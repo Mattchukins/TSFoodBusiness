@@ -1,4 +1,4 @@
--- TSFoodBusiness install / additive upgrade to schema 7.
+-- TSFoodBusiness install / additive upgrade to schema 8.
 -- Stop the resource and back up the selected oxmysql database before import.
 -- Existing rows are preserved. CREATE IF NOT EXISTS does not repair incompatible
 -- columns, engines or indexes; the runtime metadata gate still checks those.
@@ -98,5 +98,13 @@ CREATE TABLE IF NOT EXISTS tsfb_staff (
  FOREIGN KEY (business_id) REFERENCES tsfb_businesses(id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS tsfb_staff_duty (
+ staff_id VARCHAR(36) NOT NULL PRIMARY KEY,
+ on_duty TINYINT UNSIGNED NOT NULL DEFAULT 0,
+ revision INT UNSIGNED NOT NULL DEFAULT 1,
+ updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ FOREIGN KEY (staff_id) REFERENCES tsfb_staff(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- Record all supported versions only after every table statement succeeds.
-INSERT IGNORE INTO tsfb_schema (version) VALUES (1), (2), (3), (4), (5), (6), (7);
+INSERT IGNORE INTO tsfb_schema (version) VALUES (1), (2), (3), (4), (5), (6), (7), (8);

@@ -45,18 +45,40 @@ function Staff.handle(src, actor, action, data)
     local keys = action == 'listStaff' and { businessId = true }
         or action == 'assignStaffMember' and { businessId = true, targetSource = true, displayName = true, role = true }
         or action == 'updateStaffMember' and { businessId = true, staffId = true, revision = true, displayName = true, role = true }
+        or action == 'setStaffDuty' and { businessId = true, staffId = true, revision = true, onDuty = true }
         or action == 'removeStaffMember' and { businessId = true, staffId = true, revision = true }
     if not keys or not exact(data, keys)
         or ((action == 'assignStaffMember' or action == 'updateStaffMember') and
             (not text(data.displayName, 80) or type(data.role) ~= 'string' or not FoodBusiness.StaffRoles[data.role]))
         or (action == 'assignStaffMember' and not integer(data.targetSource, 1, 2147483647))
+        or (action == 'setStaffDuty' and (type(data.onDuty) ~= 'boolean' or not FoodBusiness.validJobId(data.staffId) or not integer(data.revision, 0, 2147483646)))
         or ((action == 'updateStaffMember' or action == 'removeStaffMember') and
             (not FoodBusiness.validJobId(data.staffId) or not integer(data.revision, 0, 2147483646))) then
         return { ok = false, error = 'invalid_payload' }
     end
     if not owns(src, actor, data.businessId) then return { ok = false, error = 'forbidden' } end
     if action == 'listStaff' then
-        return { ok = true, staff = MySQL.query.await('SELECT id, display_name, role, revision FROM tsfb_staff WHERE business_id = ? ORDER BY display_name, id LIMIT 200', { data.businessId }) }
+        return { ok = true, staff = MySQL.query.await('SELECT s.id, s.display_name, s.role, s.revision, COALESCE(d.on_duty, 0) AS on_duty, COALESCE(d.revision, 0) AS duty_revision FROM tsfb_staff s LEFT JOIN tsfb_staff_duty d ON d.staff_id = s.id WHERE s.business_id = ? ORDER BY s.display_name, s.id LIMIT 200', { data.businessId }) }
+    end
+    if action == 'setStaffDuty' then
+        local member = MySQL.single.await('SELECT id FROM tsfb_staff WHERE id = ? AND business_id = ?', { data.staffId, data.businessId })
+        if not member then return { ok = false, error = 'not_found' } end
+        local duty = MySQL.single.await('SELECT on_duty, revision FROM tsfb_staff_duty WHERE staff_id = ?', { data.staffId })
+        if (duty and tonumber(duty.revision) or 0) ~= data.revision then return { ok = false, error = 'staff_conflict' } end
+        local revision = data.revision + 1
+        local mutation = duty
+            and { query = 'UPDATE tsfb_staff_duty SET on_duty = ?, revision = revision + 1 WHERE staff_id = ? AND revision = ? AND EXISTS (SELECT 1 FROM tsfb_staff s JOIN tsfb_businesses b ON b.id = s.business_id WHERE s.id = ? AND b.id = ? AND b.owner_id = ?)',
+                values = { data.onDuty and 1 or 0, data.staffId, data.revision, data.staffId, data.businessId, actor } }
+            or { query = 'INSERT INTO tsfb_staff_duty (staff_id, on_duty, revision) SELECT s.id, ?, 1 FROM tsfb_staff s JOIN tsfb_businesses b ON b.id = s.business_id WHERE s.id = ? AND b.id = ? AND b.owner_id = ?',
+                values = { data.onDuty and 1 or 0, data.staffId, data.businessId, actor } }
+        local ok, done = pcall(function() return MySQL.transaction.await({ mutation,
+            { query = 'INSERT INTO tsfb_audit (action, actor_id, business_id, correlation_id, details) SELECT ?, ?, s.business_id, ?, ? FROM tsfb_staff_duty d JOIN tsfb_staff s ON s.id = d.staff_id WHERE d.staff_id = ? AND d.revision = ?',
+                values = { 'staff.duty', actor, 'duty:' .. data.staffId .. ':' .. revision, json.encode({ staffId = data.staffId, onDuty = data.onDuty }), data.staffId, revision } },
+        }) end)
+        if not ok or not done then return { ok = false, error = 'transaction_failed' } end
+        local saved = MySQL.single.await('SELECT on_duty, revision FROM tsfb_staff_duty WHERE staff_id = ?', { data.staffId })
+        return saved and tonumber(saved.revision) == revision and tonumber(saved.on_duty) == (data.onDuty and 1 or 0)
+            and { ok = true } or { ok = false, error = 'staff_conflict' }
     end
     if action == 'assignStaffMember' then
         local target = Framework.player(data.targetSource)

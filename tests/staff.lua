@@ -119,6 +119,42 @@ assert(send('removeStaffMember', { businessId = business, staffId = id, revision
 assert(audit['staff:' .. id .. ':2'] and #statements == 3)
 players[55] = { id = 'staff-55' }
 assert(Staff.permission(55, business, 'cook') == nil)
+local rehire = assign(); assert(rehire.ok)
+local dutyRow = nil
+local singleOriginal, transactionOriginal = MySQL.single.await, MySQL.transaction.await
+MySQL.single.await = function(query, values)
+    if query:find('FROM tsfb_staff_duty', 1, true) then assert(values[1] == rehire.staffId); return clone(dutyRow) end
+    return singleOriginal(query, values)
+end
+MySQL.transaction.await = function(value)
+    if not value[1].query:find('tsfb_staff_duty', 1, true) then return transactionOriginal(value) end
+    if fail then return false end
+    local v = value[1].values
+    if owned then
+        if value[1].query:find('INSERT', 1, true) then
+            if dutyRow then return false end
+            dutyRow = { on_duty = v[1], revision = 1 }
+        elseif dutyRow and dutyRow.revision == v[3] then
+            dutyRow.on_duty = v[1]; dutyRow.revision = dutyRow.revision + 1
+        end
+    end
+    if dutyRow and dutyRow.revision == value[2].values[6] then
+        assert(not audit[value[2].values[3]]); audit[value[2].values[3]] = true
+    end
+    return true
+end
+local dutyPayload = { businessId = business, staffId = rehire.staffId, revision = 0, onDuty = true }
+assert(send('setStaffDuty', dutyPayload, 55).error == 'forbidden' and dutyRow == nil)
+dutyPayload.onDuty = 'yes'; assert(send('setStaffDuty', dutyPayload).error == 'invalid_payload')
+dutyPayload.onDuty = true; fail = true
+assert(send('setStaffDuty', dutyPayload).error == 'transaction_failed' and dutyRow == nil)
+fail = false
+assert(send('setStaffDuty', dutyPayload).ok and dutyRow.on_duty == 1 and dutyRow.revision == 1)
+assert(audit['duty:' .. rehire.staffId .. ':1'])
+assert(send('setStaffDuty', dutyPayload).error == 'staff_conflict' and dutyRow.revision == 1)
+dutyPayload.revision = 1; dutyPayload.onDuty = false
+assert(send('setStaffDuty', dutyPayload).ok and dutyRow.on_duty == 0 and dutyRow.revision == 2)
+assert(audit['duty:' .. rehire.staffId .. ':2'])
 FoodBusiness.Modules.staff = false
 assert(send('listStaff', { businessId = business }).error == 'staff_disabled')
 assert(Staff.role(42, business) == nil)

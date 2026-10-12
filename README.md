@@ -4,7 +4,7 @@ Early development, currently **v0.8.0-dev**. [Roadmap](ROADMAP.md) phases v0.1�
 
 ## Local setup
 
-1. Stop the resource, back up the oxmysql database and import `sql/install.sql` with stop-on-error enabled. Use the same file for fresh setup and additive upgrades. Existing data is preserved. The resource refuses database requests unless schema versions 1–7 and required columns are present. The database account must be able to read its own metadata from `information_schema`.
+1. Stop the resource, back up the oxmysql database and import `sql/install.sql` with stop-on-error enabled. Use the same file for fresh setup and additive upgrades. Existing data is preserved. The resource refuses database requests unless schema versions 1–8 and required columns are present. The database account must be able to read its own metadata from `information_schema`.
 2. Start `oxmysql`, `ox_lib`, and exactly one primary framework: ESX, QBCore or QBox. QBox may expose qb-core compatibility without counting as a second framework. Set `FoodBusiness.Framework` explicitly in `shared/config.lua` if auto detection is inappropriate.
 3. Run `cd web && npm install && npm run check && npm run build`. The generated `web/dist` folder must be included with the installed resource.
 4. Add `ensure ts-foodbusiness` after dependencies in `server.cfg`. Grant trusted staff `add_ace group.admin tsfoodbusiness.create allow` or your equivalent ACE mapping.
@@ -59,3 +59,5 @@ The **Staff** screen lets a business owner assign an online character by current
 `GetBusinessStaffRole(source, businessId)` returns `owner`, a saved role, or nil when no verified role is available. `HasBusinessStaffPermission(source, businessId, permission)` supports `cook`, `take_orders` and `manage_catalog`: owners/managers have all three, cooks have `cook`, and cashiers have `take_orders`. It returns true/false for a resolved role, nil when role lookup fails or membership is missing, and false for unknown permissions. Callers must require `== true` and recheck before mutation. Live source identity is checked after awaited reads.
 
 These exports are integration prerequisites. Existing management and cooking actions remain owner-only; the staff roster does not yet grant staff access to those screens or jobs. Duty/shift tracking and delegated staff workflows remain pending. Live database persistence, concurrency and each framework's character switching require verification.
+
+Owner-managed duty status is now available in the Staff roster. Import the current install.sql to add schema 8. Entries start off duty, and owners can change the saved status even while members are offline. Each change uses a separate duty revision and transactional audit. This is manual status only: it persists across disconnects and restarts, grants no extra permissions, and does not calculate shift times or payroll.

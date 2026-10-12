@@ -43,3 +43,5 @@ Production-profile configuration added on 2026-10-08: Lua syntax, mocked product
 Schema 6 cooking jobs and the custom atomic mutation contract are locally implemented. The kitchen remains disabled by default. Live SQL upgrade, constraint/rollback behaviour, provider conservation/replay/recovery, disconnects, clock stability and each framework must be verified before enabling. React job controls compile but interactive FiveM QA remains pending.
 
 Schema 7 staff roster is locally implemented with owner-only assignment/edit/removal, server-resolved online target identities, stale revision guards and transactional audit. Permission exports revalidate source identities after awaited reads; cooking and management delegation remain pending. Live persistence, concurrent edits, source recycling and framework character switching need verification.
+
+Schema 8 manual staff duty flags compile and pass mocked owner/payload/revision/failure checks. Live SQL installation, duty persistence, audit rollback and membership-delete cascade remain pending. This is not shift or payroll tracking.

@@ -8,6 +8,7 @@ Schema.required = {
     tsfb_operations = { 'business_id', 'opens_minute', 'closes_minute', 'seat_capacity', 'queue_capacity', 'updated_at' },
     tsfb_production_profiles = { 'recipe_id', 'station_type', 'output_item', 'output_quantity', 'duration_seconds', 'updated_at' },
     tsfb_cooking_jobs = { 'id', 'business_id', 'actor_id', 'recipe_id', 'station_id', 'request_token', 'batches', 'plan_json', 'plan_key', 'provider_resource', 'state', 'revision', 'ready_at', 'station_slot', 'actor_slot', 'created_at', 'updated_at' },
+    tsfb_staff_duty = { 'staff_id', 'on_duty', 'revision', 'updated_at' },
     tsfb_staff = { 'id', 'business_id', 'member_id', 'display_name', 'role', 'revision', 'created_at', 'updated_at' },
     tsfb_stations = { 'id', 'business_id', 'name', 'type', 'x', 'y', 'z', 'heading', 'routing_bucket', 'created_at' },
 }
@@ -31,14 +32,14 @@ end
 
 function Schema.verify()
     local ok, rows = pcall(function()
-        return MySQL.query.await("SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs', 'tsfb_staff')")
+        return MySQL.query.await("SELECT TABLE_NAME AS table_name, COLUMN_NAME AS column_name FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs', 'tsfb_staff', 'tsfb_staff_duty')")
     end)
     if not ok then return false, 'schema metadata query failed' end
     local valid, reason = Schema.checkColumns(rows)
     if not valid then return false, reason end
     local metadataOk, tables, indexes = pcall(function()
-        local engines = MySQL.query.await("SELECT TABLE_NAME AS table_name, ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs', 'tsfb_staff')")
-        local keys = MySQL.query.await("SELECT TABLE_NAME AS table_name, INDEX_NAME AS index_name, NON_UNIQUE AS non_unique, COLUMN_NAME AS column_name, SUB_PART AS sub_part FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs', 'tsfb_staff')")
+        local engines = MySQL.query.await("SELECT TABLE_NAME AS table_name, ENGINE AS engine FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs', 'tsfb_staff', 'tsfb_staff_duty')")
+        local keys = MySQL.query.await("SELECT TABLE_NAME AS table_name, INDEX_NAME AS index_name, NON_UNIQUE AS non_unique, COLUMN_NAME AS column_name, SUB_PART AS sub_part FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('tsfb_schema', 'tsfb_businesses', 'tsfb_audit', 'tsfb_recipes', 'tsfb_suppliers', 'tsfb_operations', 'tsfb_stations', 'tsfb_production_profiles', 'tsfb_cooking_jobs', 'tsfb_staff', 'tsfb_staff_duty')")
         return engines, keys
     end)
     if not metadataOk then return false, 'schema integrity query failed' end
@@ -65,7 +66,7 @@ function Schema.checkIntegrity(tables, indexes)
     end
     for name in pairs(Schema.required) do
         if engines[name] ~= 'innodb' then return false, 'transactional InnoDB table required: ' .. name end
-        local column = name == 'tsfb_schema' and 'version' or name == 'tsfb_operations' and 'business_id' or name == 'tsfb_production_profiles' and 'recipe_id' or 'id'
+        local column = name == 'tsfb_schema' and 'version' or name == 'tsfb_operations' and 'business_id' or name == 'tsfb_staff_duty' and 'staff_id' or name == 'tsfb_production_profiles' and 'recipe_id' or 'id'
         if not uniqueColumn(name, 'PRIMARY', column) then return false, 'invalid primary key: ' .. name end
     end
     local auditUnique = false

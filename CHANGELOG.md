@@ -79,3 +79,9 @@
 - Added Manager/Cook/Cashier role registry and guarded server permission lookup exports; existing management and cooking remain owner-only.
 - Added a React/Tailwind Staff screen with search, role selection, confirmed removal, reload and uncertain-result feedback.
 - Added mocked source-change, spoofed identity, ownership, stale-write and failure checks to CI. Live FiveM/MySQL/framework validation remains pending.
+
+### Manual staff duty — schema 8
+
+- Added owner-managed on/off-duty status in the React/Tailwind roster, using separate revision checks and transactional audit.
+- Added a staff-linked duty table to the existing install/uninstall SQL pair; staff deletion cascades its current duty status.
+- Status persists until changed; self-service clocking, shift durations, disconnect clock-out and payroll remain pending. Local mocked checks pass; live persistence/rollback remains unverified.

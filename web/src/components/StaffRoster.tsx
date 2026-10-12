@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-export type StaffMember = { id: string; display_name: string; role: string; revision: number }
+export type StaffMember = { id: string; display_name: string; role: string; revision: number; on_duty: number | string; duty_revision: number | string }
 export type StaffRole = { id: string; label: string; permissions: string[] }
 export type StaffResponse = { ok: boolean; error?: string; staff?: StaffMember[]; staffRoles?: StaffRole[] }
 const errors: Record<string, string> = {
@@ -67,6 +67,7 @@ export function StaffRoster({ businessId, request, busy, onBusy }: {
   const filtered = members.filter(member => member.display_name.toLowerCase().includes(search.trim().toLowerCase()))
   return <section aria-label="Business staff roster">
     <p>Assign an online character using their current server ID. The roster keeps their character assignment after disconnects. Labels can be edited while staff are offline.</p>
+    <p>Duty status is set by the owner and persists until changed. It does not track shift time or clock out automatically on disconnect.</p>
     <p>Roles are saved for permission integrations. Staff access to this management interface and cooking is still being developed.</p>
     {state === 'loading' && <p role="status">Loading staff roster…</p>}
     {state === 'ready' && <>
@@ -76,8 +77,8 @@ export function StaffRoster({ businessId, request, busy, onBusy }: {
       {members.length === 0 && <p>No staff assigned to this business.</p>}
       {members.length > 0 && filtered.length === 0 && <p>No roster labels match this search.</p>}
       <ul className="p-0">{filtered.map(member => <li key={member.id} className="my-3 list-none rounded-lg border border-solid border-border p-3">
-        <p><strong>{member.display_name}</strong> · {roles.find(entry => entry.id === member.role)?.label || member.role}</p>
-        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} aria-label={`Edit ${member.display_name}`} onClick={() => { setEditing(member); setName(member.display_name); setRole(member.role); setSource('') }}>Edit</button>
+        <p><strong>{member.display_name}</strong> · {roles.find(entry => entry.id === member.role)?.label || member.role} · {Number(member.on_duty) === 1 ? 'On duty' : 'Off duty'}</p>
+        <div className="flex flex-wrap gap-2"><button type="button" disabled={busy} onClick={() => void mutate('setStaffDuty', { staffId: member.id, revision: Number(member.duty_revision), onDuty: Number(member.on_duty) !== 1 })}>{Number(member.on_duty) === 1 ? 'Mark off duty' : 'Mark on duty'}</button><button type="button" disabled={busy} aria-label={`Edit ${member.display_name}`} onClick={() => { setEditing(member); setName(member.display_name); setRole(member.role); setSource('') }}>Edit</button>
           <button type="button" disabled={busy} aria-label={`Remove ${member.display_name}`} onClick={() => { if (window.confirm(`Remove ${member.display_name} from this business?`)) void mutate('removeStaffMember', { staffId: member.id, revision: Number(member.revision) }) }}>Remove</button></div>
       </li>)}</ul>
       <h3>{editing ? 'Edit staff member' : 'Assign staff member'}</h3>

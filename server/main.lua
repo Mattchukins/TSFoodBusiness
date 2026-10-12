@@ -68,7 +68,7 @@ local function handleRequest(src, request)
         respond(src, request.requestId, { ok = false, error = 'identity_unavailable' }); return
     end
     if request.action == 'listStaffRoles' or request.action == 'listStaff' or request.action == 'assignStaffMember'
-        or request.action == 'updateStaffMember' or request.action == 'removeStaffMember' then
+        or request.action == 'setStaffDuty' or request.action == 'updateStaffMember' or request.action == 'removeStaffMember' then
         respond(src, request.requestId, Staff.handle(src, person.id, request.action, request.data)); return
     end
     local jobActions = { listCookingJobs = 'list', startCookingJob = 'start',
