@@ -158,7 +158,11 @@ function ConventionalCooking.begin(src, actor, data)
         beginning[src] = nil
         return { ok = false, error = 'invalid_duration' }
     end
-    local inspection, inspectError = Inventory.inspectPlan(src, plan)
+    local inspectOk, inspection, inspectError = pcall(Inventory.inspectPlan, src, plan)
+    if not inspectOk then
+        beginning[src] = nil
+        return { ok = false, error = 'inventory_unavailable' }
+    end
     if not inspection then
         beginning[src] = nil
         return { ok = false, error = inspectError or 'inventory_unavailable' }
@@ -167,7 +171,11 @@ function ConventionalCooking.begin(src, actor, data)
         beginning[src] = nil
         return { ok = false, error = 'insufficient_ingredients' }
     end
-    local canCarry, capacityError = Inventory.standardOxCanCarry(src, plan.outputItem, plan.outputQuantity)
+    local capacityOk, canCarry, capacityError = pcall(Inventory.standardOxCanCarry, src, plan.outputItem, plan.outputQuantity)
+    if not capacityOk then
+        beginning[src] = nil
+        return { ok = false, error = 'inventory_unavailable' }
+    end
     if canCarry ~= true then
         beginning[src] = nil
         return { ok = false, error = canCarry == nil and (capacityError or 'inventory_unavailable') or 'output_full' }
