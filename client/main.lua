@@ -292,6 +292,7 @@ refreshCookingTargets = function()
         end
         local registered = 0
         for _, key in ipairs(order) do
+            table.sort(stations[key].options, function(a, b) return a.name < b.name end)
             local station = stations[key]
             local ok, zone = pcall(function()
                 return exports.ox_target:addSphereZone({
