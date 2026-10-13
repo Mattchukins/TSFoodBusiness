@@ -64,4 +64,11 @@ fi
 if sql "CALL tsfb_stock_release('99999999-1234-1234-1234-123456789abc','$owner','$key');" >/dev/null 2>&1; then
   echo 'ERROR: missing release receipt accepted' >&2; exit 1
 fi
+# Invalid output cannot consume ingredients or create a receipt.
+bad_job='aaaaaaaa-1234-1234-1234-123456789abc'
+if sql "CALL tsfb_stock_reserve('$bad_job','$owner','$key','{\"outputItem\":\"bread\",\"outputQuantity\":0,\"ingredients\":[{\"item\":\"flour\",\"quantity\":1}]}');" >/dev/null 2>&1; then
+  echo 'ERROR: zero output accepted' >&2; exit 1
+fi
+[[ "$(scalar "SELECT COUNT(*) FROM tsfb_ox_production_receipts WHERE job_id='$bad_job'")" == 0 ]]
+[[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='flour'")" == 7 ]]
 echo 'MySQL stock reserve/commit/release/replay/rollback integration tests passed'
