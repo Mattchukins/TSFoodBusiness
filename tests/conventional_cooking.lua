@@ -85,6 +85,14 @@ assert(ConventionalCooking.finish(1, 'owner', expired.token).error == 'cooking_e
 local again = ConventionalCooking.begin(1, 'owner', request)
 assert(again.ok)
 ConventionalCooking.drop(1)
+local originalInspect = Inventory.inspectPlan
+Inventory.inspectPlan = function() return { available = false } end
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'insufficient_ingredients')
+Inventory.inspectPlan = function() error('inventory disconnected') end
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'inventory_unavailable')
+Inventory.inspectPlan = originalInspect
+assert(ConventionalCooking.begin(1, 'owner', request).ok)
+ConventionalCooking.drop(1)
 FoodBusiness.Modules.kitchen = false
 assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_disabled')
 print('conventional cooking inventory, timer, replay and cancellation tests passed')
