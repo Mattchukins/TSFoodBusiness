@@ -10,7 +10,15 @@ dofile('bridges/inventory.lua')
 exports.ox_inventory = {
     Items = function(_, item) return item == 'bread' and { name = item } or nil end,
     GetItemCount = function(_, src, item) assert(src == 42 and item == 'flour'); return count end,
+    RemoveItem = function(_, src, item, qty) assert(src == 42 and item == 'flour' and qty == 2); return true end,
+    AddItem = function(_, src, item, qty) assert(src == 42 and item == 'bread' and qty == 1); return false, 'inventory_full' end,
+    CanCarryItem = function(_, src, item, qty) assert(src == 42 and item == 'bread' and qty == 1); return false end,
 }
+assert(Inventory.standardOxRemove(42, 'flour', 2) == true)
+local added, addReason = Inventory.standardOxAdd(42, 'bread', 1)
+assert(added == false and addReason == 'inventory_full')
+assert(Inventory.standardOxCanCarry(42, 'bread', 1) == false)
+assert(Inventory.standardOxRemove(42, 'flour', 0) == nil)
 assert(Inventory.capabilities().configured and not Inventory.capabilities().atomicProduction)
 assert(Inventory.itemExists('bread') == true)
 assert(Inventory.itemExists('missing') == false)
