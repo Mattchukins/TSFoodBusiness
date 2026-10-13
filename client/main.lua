@@ -293,7 +293,7 @@ end)
 AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= 'ox_target' then return end
     cookingRefreshEpoch = cookingRefreshEpoch + 1
-    cookingRefreshQueued = true
+    cookingRefreshQueued = refreshingCookingTargets
     automaticZones = {}
     automaticTargetSignature = nil
     targetZones = {}
