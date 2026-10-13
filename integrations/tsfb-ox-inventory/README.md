@@ -80,3 +80,19 @@ frameworks (ESX, QBCore and QBox) independently, including disconnects,
 capacity failures, metadata preservation, restart recovery, simultaneous
 claims and duplicate requests. Record observed database and inventory
 balances before and after each test. No live verification has been performed.
+
+
+## Experimental SQL-owned stock procedures
+
+`stock_schema.sql` defines stock and escrow tables; `stock_procedures.sql`
+defines three MySQL 8+ procedures: `tsfb_stock_reserve`,
+`tsfb_stock_commit`, and `tsfb_stock_release`. These run receipt, stock,
+escrow and audit mutations inside a single InnoDB transaction. They are
+**not connected to the Lua provider exports**, and **not integrated with
+ox_inventory item transfers**. SQL-owned stock is not a player inventory.
+
+**Do not execute these procedures on production data yet.** They require
+database-level integration tests, verified JSON input constraints, stock
+capacity/overflow checks, consistent locking against every stock writer,
+and versioned migrations. The existing `stock_engine.lua` deliberately
+refuses mutations until this executor is fully validated and wired.
