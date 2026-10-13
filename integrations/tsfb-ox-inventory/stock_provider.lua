@@ -32,3 +32,11 @@ end)
 exports('SqlStockReleaseExperimental', function(payload)
     return Engine.release(payload, procedure)
 end)
+
+-- Operator-only diagnostics; not callable by clients through a network event.
+local Reconciliation = LoadResourceFile and assert(load(LoadResourceFile(
+    GetCurrentResourceName(), 'reconciliation.lua'), '@reconciliation.lua'))()
+    or dofile('integrations/tsfb-ox-inventory/reconciliation.lua')
+exports('SqlStockReconciliationScanExperimental', function()
+    return Reconciliation.scan()
+end)
