@@ -59,10 +59,14 @@ local function transition(job, target, readyAt)
     return updated
 end
 local function reconcileReceipt(job, receipt)
+    -- A conflicting durable receipt is not a successful reconciliation.
+    -- Hold the job for operator investigation rather than silently accepting it.
+    if job.state == 'completed' and receipt.state ~= 'committed' then return nil end
+    if job.state == 'cancelled' and receipt.state ~= 'released' then return nil end
     if receipt.state == 'committed' then
-        return FoodBusiness.jobTerminal(job.state) and job or transition(job, 'completed')
+        return job.state == 'completed' and job or transition(job, 'completed')
     elseif receipt.state == 'released' then
-        return FoodBusiness.jobTerminal(job.state) and job or transition(job, 'cancelled')
+        return job.state == 'cancelled' and job or transition(job, 'cancelled')
     elseif receipt.state == 'reserved' and job.state == 'reserving' then
         local plan = decodePlan(job)
         if not plan then return nil end
