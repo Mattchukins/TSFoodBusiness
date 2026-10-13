@@ -54,8 +54,9 @@ function Journal.inspectReceipt(payload)
     if record.ownerId ~= payload.ownerId or record.planKey ~= payload.planKey then
         return nil, 'reservation_conflict'
     end
-    -- Intent is not a provider receipt. It requires manual reconciliation.
-    if record.state == 'intent' then return nil, 'reservation_unresolved' end
+    -- No ox_inventory mutation engine exists yet: reserved/committed journal
+    -- rows cannot be trusted as proof of inventory movement.
+    if record.state ~= 'released' then return nil, 'reservation_unresolved' end
     return { jobId = payload.jobId, ownerId = payload.ownerId,
         planKey = payload.planKey, state = record.state }
 end
