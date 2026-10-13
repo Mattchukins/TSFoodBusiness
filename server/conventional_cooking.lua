@@ -113,11 +113,8 @@ end
 -- Resolve the recipe and station exclusively on the server. This entrypoint
 -- remains opt-in until duration, replay and recovery are integrated.
 function ConventionalCooking.start(src, actor, data)
-    if not FoodBusiness or not FoodBusiness.ConventionalCookingEnabled then
+    if not FoodBusiness or not FoodBusiness.Modules.kitchen then
         return { ok = false, error = 'cooking_disabled' }
-    end
-    if not FoodBusiness.ConventionalCookingDurableReady then
-        return { ok = false, error = 'durable_cooking_not_ready' }
     end
     if type(data) ~= 'table' or type(actor) ~= 'string'
         or not FoodBusiness.validJobId(data.businessId)
