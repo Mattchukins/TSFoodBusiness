@@ -76,6 +76,9 @@ local function handleRequest(src, request)
         if not exactKeys(data, { businessId = true, recipeId = true, stationId = true, batches = true }) then
             respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
         end
+        if not ConventionalCooking then
+            respond(src, request.requestId, { ok = false, error = 'cooking_unavailable' }); return
+        end
         respond(src, request.requestId, ConventionalCooking.start(src, person.id, data)); return
     end
     local jobActions = { listCookingJobs = 'list', startCookingJob = 'start',
@@ -619,7 +622,7 @@ if CookingJobs then
         end,
     }
     CookingJobs.configure(cookingDependencies)
-    ConventionalCooking.configure(cookingDependencies)
+    if ConventionalCooking then ConventionalCooking.configure(cookingDependencies) end
 end
 
 exports('GetBusinessStaffRole', function(src, businessId)
