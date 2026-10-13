@@ -195,10 +195,17 @@ function ConventionalCooking.begin(src, actor, data)
         beginning[src] = nil
         return { ok = false, error = 'player_disconnected' }
     end
-    if not dependencies.owner(src, actor, data.businessId)
-        or not dependencies.near(src, actor, data.businessId, data.stationId, plan) then
+    local authOk, authorized = pcall(function()
+        return dependencies.owner(src, actor, data.businessId) == true
+            and dependencies.near(src, actor, data.businessId, data.stationId, plan) == true
+    end)
+    if not authOk or not authorized then
         beginning[src] = nil
         return { ok = false, error = 'forbidden' }
+    end
+    if generationAtStart ~= (generation[src] or 0) then
+        beginning[src] = nil
+        return { ok = false, error = 'player_disconnected' }
     end
     local token = ('%d-%d-%d'):format(src, GetGameTimer(), math.random(100000, 999999))
     active[src] = { token = token, actor = actor, data = data, plan = plan,
