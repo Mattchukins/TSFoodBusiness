@@ -44,6 +44,16 @@ function ConventionalCooking.produce(src, plan, authorize)
         if not inspection.available then return { ok = false, error = 'insufficient_ingredients' } end
         local removed = {}
         for _, entry in ipairs(plan.ingredients) do
+            -- Re-check access immediately before each irreversible mutation.
+            if authorize(src, plan) ~= true then
+                local restored = true
+                for i = #removed, 1, -1 do
+                    if Inventory.standardOxAdd(src, removed[i].item, removed[i].quantity) ~= true then
+                        restored = false
+                    end
+                end
+                return { ok = false, error = restored and 'forbidden' or 'manual_inventory_recovery_required' }
+            end
             local done, removeError = Inventory.standardOxRemove(src, entry.item, entry.quantity)
             if done ~= true then
                 -- A thrown export or malformed result has an unknown mutation
@@ -61,6 +71,15 @@ function ConventionalCooking.produce(src, plan, authorize)
                     or 'manual_inventory_recovery_required' }
             end
             removed[#removed + 1] = entry
+        end
+        if authorize(src, plan) ~= true then
+            local restored = true
+            for i = #removed, 1, -1 do
+                if Inventory.standardOxAdd(src, removed[i].item, removed[i].quantity) ~= true then
+                    restored = false
+                end
+            end
+            return { ok = false, error = restored and 'forbidden' or 'manual_inventory_recovery_required' }
         end
         local awarded, awardError = Inventory.standardOxAdd(src, plan.outputItem, plan.outputQuantity)
         if awarded == true then return { ok = true } end
