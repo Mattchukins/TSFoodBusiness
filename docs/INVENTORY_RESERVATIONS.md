@@ -1,3 +1,24 @@
+## Standard ox_inventory default (simplified architecture)
+
+The default `FoodBusiness.Inventory.provider = 'ox_inventory'` connects **directly**
+to upstream `ox_inventory` for item definitions and player item counts. No
+`tsfb-ox-inventory` resource, stored procedures, or SQL stock tables are
+required for those read-only operations. Business ownership, staff, recipes,
+stations and audit records continue to use the normal TSFoodBusiness database.
+
+**Important:** This does not enable cooking. The existing durable cooking-job
+engine still requires a verified atomic reservation/commit provider and
+`FoodBusiness.Modules.kitchen` remains false. Upstream `RemoveItem` and
+`AddItem` are not an atomic pair. Do not turn on kitchen or set
+`mutationsVerified = true` simply because the item preview works.
+
+The experimental SQL-owned stock procedures and reconciliation tooling remain
+optional, isolated in `integrations/tsfb-ox-inventory/`, for a future
+persistent-business-stock mode. They are **not** the default player-inventory
+path and do not establish atomicity for player items.
+
+---
+
 # Inventory reservation contract
 
 Status: custom mutation bridge and durable job orchestration implemented, verified only with mocks. The default configuration keeps all mutation calls disabled. No inventory-specific provider implementation or live certification is included. Atomic production requires explicit operator opt-in; compensation remains false because separate remove/add compensation is unsupported.
