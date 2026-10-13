@@ -45,4 +45,13 @@ assert(ConventionalCooking.produce(1, plan, function()
  return false
 end).error == 'forbidden')
 assert(nested.error == 'cooking_busy' and stock.flour == 3)
-print('conventional cooking compensation, uncertain outcome and locking tests passed')
+-- Revoking access between ingredient removals must refund consumed items.
+stock.flour, stock.water = 3, 2
+local authorizationCalls = 0
+local denied = ConventionalCooking.produce(1, plan, function()
+ authorizationCalls = authorizationCalls + 1
+ return authorizationCalls <= 2
+end)
+assert(denied.error == 'forbidden')
+assert(stock.flour == 3 and stock.water == 2)
+print('conventional cooking compensation, reauthorization, uncertain outcome and locking tests passed')
