@@ -178,6 +178,7 @@ end)
 -- Refresh local target zones from the server's owned, compatible recipes.
 local automaticZones = {}
 local refreshingCookingTargets = false
+local cookingRefreshQueued = false
 local function clearAutomaticZones()
     for _, zone in ipairs(automaticZones) do
         exports[GetCurrentResourceName()]:RemoveCookingStation(zone)
@@ -185,10 +186,15 @@ local function clearAutomaticZones()
     automaticZones = {}
 end
 refreshCookingTargets = function()
-    if refreshingCookingTargets or pendingCount >= 10 or GetResourceState('ox_target') ~= 'started' then return end
+    if refreshingCookingTargets then cookingRefreshQueued = true; return end
+    if pendingCount >= 10 or GetResourceState('ox_target') ~= 'started' then return end
     refreshingCookingTargets = true
     ask('listCookingTargets', {}, function(result)
         refreshingCookingTargets = false
+        if cookingRefreshQueued then
+            cookingRefreshQueued = false
+            SetTimeout(250, refreshCookingTargets)
+        end
         if not result or not result.ok or type(result.targets) ~= 'table' then return end
         clearAutomaticZones()
         for _, target in ipairs(result.targets) do
