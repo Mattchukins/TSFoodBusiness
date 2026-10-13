@@ -13,6 +13,7 @@ BEGIN
  DECLARE v_state VARCHAR(20);
  DECLARE v_owner VARCHAR(80);
  DECLARE v_key VARCHAR(1600);
+ DECLARE v_existing_plan LONGTEXT;
  DECLARE v_item VARCHAR(64);
  DECLARE v_qty BIGINT;
  DECLARE v_done BOOLEAN DEFAULT FALSE;
@@ -42,10 +43,14 @@ BEGIN
   (job_id,owner_id,plan_key,plan_json,state)
  VALUES(p_job,p_owner,p_key,p_plan,'intent');
  SET v_done=FALSE;
- SELECT state,owner_id,plan_key INTO v_state,v_owner,v_key
+ SELECT state,owner_id,plan_key,plan_json INTO v_state,v_owner,v_key,v_existing_plan
  FROM tsfb_ox_production_receipts WHERE job_id=p_job FOR UPDATE;
  IF v_owner IS NULL OR v_owner <> p_owner OR v_key IS NULL OR BINARY v_key <> BINARY p_key THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='reservation_conflict';
+ END IF;
+ IF v_existing_plan IS NULL OR JSON_CONTAINS(v_existing_plan, p_plan) <> 1
+    OR JSON_CONTAINS(p_plan, v_existing_plan) <> 1 THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='reservation_plan_conflict';
  END IF;
  IF v_state='intent' THEN
   SET v_done=FALSE;
@@ -141,7 +146,7 @@ BEGIN
  START TRANSACTION;
  SELECT state,owner_id,plan_key,revision INTO v_state,v_owner,v_key,v_rev
  FROM tsfb_ox_production_receipts WHERE job_id=p_job FOR UPDATE;
- IF v_owner <> p_owner OR BINARY v_key <> BINARY p_key THEN
+ IF v_owner IS NULL OR v_owner <> p_owner OR v_key IS NULL OR BINARY v_key <> BINARY p_key THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='reservation_conflict';
  END IF;
  IF v_state='reserved' THEN
