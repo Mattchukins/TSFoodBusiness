@@ -93,6 +93,20 @@ assert(ConventionalCooking.begin(1, 'owner', request).error == 'inventory_unavai
 Inventory.inspectPlan = originalInspect
 assert(ConventionalCooking.begin(1, 'owner', request).ok)
 ConventionalCooking.drop(1)
+-- Finishing cannot overlap a new cooking start, even during inventory callbacks.
+local finishingSession = ConventionalCooking.begin(1, 'owner', request)
+assert(finishingSession.ok)
+now = now + 2000
+local originalRemove = Inventory.standardOxRemove
+local overlapping
+Inventory.standardOxRemove = function(src, item, quantity)
+ overlapping = ConventionalCooking.begin(src, 'owner', request)
+ return originalRemove(src, item, quantity)
+end
+stock.flour, stock.water = 3, 2
+assert(ConventionalCooking.finish(1, 'owner', finishingSession.token).ok)
+assert(overlapping.error == 'cooking_busy')
+Inventory.standardOxRemove = originalRemove
 FoodBusiness.Modules.kitchen = false
 assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_disabled')
 print('conventional cooking inventory, timer, replay and cancellation tests passed')
