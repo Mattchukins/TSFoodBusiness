@@ -22,4 +22,18 @@ row.state = 'reserved'; row.revision = -1
 assert(select(2, journal.inspect(id)) == 'invalid_journal_row')
 MySQL.single.await = function() error('db stopped') end
 assert(select(2, journal.inspect(id)) == 'database_unavailable')
-print('ox production journal diagnostic validation passed (mocked)')
+
+-- A released tombstone is idempotent and cannot overwrite an active claim.
+local stored
+json = { encode = function() return '{}' end }
+MySQL.update = { await = function(_, values)
+    if not stored then stored = { job_id = values[1], owner_id = values[2], plan_key = values[3], state = 'released', revision = 0 } end
+    return 1
+end }
+MySQL.single.await = function() return stored end
+local payload = { jobId = id, ownerId = 'owner-42', planKey = 'plan-key', plan = {} }
+assert(journal.releaseAbsent(payload).state == 'released')
+assert(journal.releaseAbsent(payload).state == 'released')
+stored.state = 'reserved'
+assert(select(2, journal.releaseAbsent(payload)) == 'reservation_conflict')
+print('ox production journal diagnostic validation and release tombstones passed (mocked)')
