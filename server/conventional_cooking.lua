@@ -88,3 +88,39 @@ function ConventionalCooking.produce(src, plan, authorize)
     end
     return result
 end
+
+-- Resolve the recipe and station exclusively on the server. This entrypoint
+-- remains opt-in until duration, replay and recovery are integrated.
+function ConventionalCooking.start(src, actor, data)
+    if not FoodBusiness or not FoodBusiness.ConventionalCookingEnabled then
+        return { ok = false, error = 'cooking_disabled' }
+    end
+    if type(data) ~= 'table' or type(actor) ~= 'string'
+        or not FoodBusiness.validJobId(data.businessId)
+        or not FoodBusiness.validJobId(data.recipeId)
+        or not FoodBusiness.validJobId(data.stationId)
+        or type(data.batches) ~= 'number' or data.batches ~= math.floor(data.batches)
+        or data.batches < 1 or data.batches > 100 then
+        return { ok = false, error = 'invalid_request' }
+    end
+    if type(dependencies.owner) ~= 'function' or type(dependencies.plan) ~= 'function'
+        or type(dependencies.near) ~= 'function' then
+        return { ok = false, error = 'cooking_unavailable' }
+    end
+    local ok, result = pcall(function()
+        if not dependencies.owner(src, actor, data.businessId) then
+            return { ok = false, error = 'forbidden' }
+        end
+        local plan = dependencies.plan(src, data.businessId, data.recipeId, data.stationId, data.batches)
+        if not validate(plan) then return { ok = false, error = 'production_plan_unavailable' } end
+        if not dependencies.near(src, actor, data.businessId, data.stationId, plan) then
+            return { ok = false, error = 'station_not_near' }
+        end
+        return ConventionalCooking.produce(src, plan, function()
+            return dependencies.owner(src, actor, data.businessId)
+                and dependencies.near(src, actor, data.businessId, data.stationId, plan)
+        end)
+    end)
+    if not ok then return { ok = false, error = 'cooking_unavailable' } end
+    return result
+end
