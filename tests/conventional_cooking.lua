@@ -107,6 +107,23 @@ stock.flour, stock.water = 3, 2
 assert(ConventionalCooking.finish(1, 'owner', finishingSession.token).ok)
 assert(overlapping.error == 'cooking_busy')
 Inventory.standardOxRemove = originalRemove
+-- A disconnect during a yielding recipe lookup must not restore a session.
+ConventionalCooking.configure({
+ owner = function() return true end,
+ near = function() return true end,
+ plan = function()
+  ConventionalCooking.drop(1)
+  return plan
+ end,
+})
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'player_disconnected')
+ConventionalCooking.configure({
+ owner = function() return true end,
+ near = function() return true end,
+ plan = function() return plan end,
+})
+assert(ConventionalCooking.begin(1, 'owner', request).ok)
+ConventionalCooking.drop(1)
 FoodBusiness.Modules.kitchen = false
 assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_disabled')
 print('conventional cooking inventory, timer, replay and cancellation tests passed')
