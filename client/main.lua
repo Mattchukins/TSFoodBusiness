@@ -257,29 +257,55 @@ refreshCookingTargets = function()
         local signature = table.concat(signatureParts, '|')
         if signature == automaticTargetSignature then return end
         clearAutomaticZones()
-        local registered = 0
-        local eligible = 0
+        -- One ox_target zone per station, with one option per compatible recipe.
+        -- This avoids overlapping spheres for kitchens with several dishes.
+        local stations = {}
+        local order = {}
         for _, target in ipairs(result.targets) do
             if type(target.x) == 'number' and type(target.y) == 'number'
                 and type(target.z) == 'number'
                 and target.x == target.x and target.y == target.y and target.z == target.z
                 and math.abs(target.x) < 100000 and math.abs(target.y) < 100000
                 and math.abs(target.z) < 100000
-                then
-                eligible = eligible + 1
-                local zone = exports[GetCurrentResourceName()]:RegisterCookingStation({
-                    businessId = target.businessId, recipeId = target.recipeId,
-                    stationId = target.stationId,
-                    coords = vector3(target.x, target.y, target.z),
-                    label = 'Prepare ' .. tostring(target.recipeName or 'food'),
-                })
-                if zone then
-                    automaticZones[#automaticZones + 1] = zone
-                    registered = registered + 1
+                and type(target.businessId) == 'string'
+                and type(target.stationId) == 'string'
+                and type(target.recipeId) == 'string' then
+                local key = target.businessId .. ':' .. target.stationId
+                local station = stations[key]
+                if not station then
+                    station = { coords = vector3(target.x, target.y, target.z), options = {} }
+                    stations[key] = station
+                    order[#order + 1] = key
                 end
+                local businessId, stationId, recipeId =
+                    target.businessId, target.stationId, target.recipeId
+                station.options[#station.options + 1] = {
+                    name = 'tsfb_cook_' .. stationId .. '_' .. recipeId,
+                    icon = 'fa-solid fa-utensils',
+                    label = 'Prepare ' .. tostring(target.recipeName or 'food'),
+                    distance = 2.0,
+                    onSelect = function()
+                        exports[GetCurrentResourceName()]:CookRecipe(businessId, recipeId, stationId, 1)
+                    end,
+                }
             end
         end
-        if registered == eligible then automaticTargetSignature = signature end
+        local registered = 0
+        for _, key in ipairs(order) do
+            local station = stations[key]
+            local ok, zone = pcall(function()
+                return exports.ox_target:addSphereZone({
+                    coords = station.coords, radius = 1.5,
+                    debug = false, options = station.options,
+                })
+            end)
+            if ok and zone then
+                targetZones[zone] = true
+                automaticZones[#automaticZones + 1] = zone
+                registered = registered + 1
+            end
+        end
+        if registered == #order then automaticTargetSignature = signature end
     end)
 end
 RegisterCommand('foodbusiness_refresh_cooking', refreshCookingTargets, false)
