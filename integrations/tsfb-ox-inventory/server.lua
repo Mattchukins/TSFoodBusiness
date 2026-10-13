@@ -2,6 +2,20 @@
 -- guarantee atomic, durable ingredient escrow and output delivery.
 local Journal = LoadResourceFile and assert(load(LoadResourceFile(GetCurrentResourceName(), 'journal.lua'), '@journal.lua'))() or dofile('integrations/tsfb-ox-inventory/journal.lua')
 
+-- A pinned upstream extension must explicitly advertise durable atomic mutations.
+-- Until that extension exists, this adapter must not be configured as verified.
+exports('ProductionMutationCapabilities', function()
+    return {
+        provider = 'ox_inventory',
+        upstreamCommit = '488aa6d754dfbf7d169f355ccbd647dc60c5ec3a',
+        atomicProduction = false,
+        durableEscrow = false,
+        atomicOutput = false,
+        restartReconciliation = false,
+        liveVerified = false,
+    }
+end)
+
 local function validItem(item)
     return type(item) == 'string' and #item >= 2 and #item <= 64
         and item:match('^[%w_%-]+$') ~= nil
