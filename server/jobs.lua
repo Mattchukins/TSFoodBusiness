@@ -96,6 +96,9 @@ local function resumeReservation(src, actor, job)
 end
 function CookingJobs.start(src, actor, data)
     if not enabled() then return result(nil, 'cooking_disabled') end
+    if type(data) ~= 'table' or type(actor) ~= 'string' or #actor < 2 or #actor > 80 then
+        return result(nil, 'invalid_payload')
+    end
     if not FoodBusiness.validJobId(data.businessId) or not FoodBusiness.validJobId(data.recipeId)
         or not FoodBusiness.validJobId(data.stationId) or not FoodBusiness.validJobToken(data.token)
         or type(data.batches) ~= 'number' or data.batches < 1 or data.batches > 100 or data.batches ~= math.floor(data.batches) then
@@ -129,6 +132,9 @@ function CookingJobs.start(src, actor, data)
     end)
 end
 function CookingJobs.list(src, actor, businessId)
+    if not FoodBusiness.validJobId(businessId) or type(actor) ~= 'string' or #actor < 2 or #actor > 80 then
+        return result(nil, 'invalid_payload')
+    end
     if not owned(src, actor, businessId) then return result(nil, 'forbidden') end
     local rows = MySQL.query.await('SELECT * FROM tsfb_cooking_jobs WHERE business_id = ? AND actor_id = ? ORDER BY created_at DESC, id DESC LIMIT 100', { businessId, actor })
     local jobs = {}
@@ -144,7 +150,9 @@ function CookingJobs.act(src, actor, data, action)
     if action ~= 'inspect' and action ~= 'resume' and action ~= 'finish' and action ~= 'cancel' then
         return result(nil, 'invalid_action')
     end
-    if type(data) ~= 'table' then return result(nil, 'invalid_payload') end
+    if type(data) ~= 'table' or type(actor) ~= 'string' or #actor < 2 or #actor > 80 then
+        return result(nil, 'invalid_payload')
+    end
     if not FoodBusiness.validJobId(data.businessId) or not FoodBusiness.validJobId(data.jobId) then return result(nil, 'invalid_payload') end
     return locked('job:' .. data.jobId, function()
         if not owned(src, actor, data.businessId) then return result(nil, 'forbidden') end
