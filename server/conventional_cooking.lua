@@ -192,6 +192,7 @@ function ConventionalCooking.finish(src, actor, token)
     if not session or session.token ~= token or session.actor ~= actor then
         return { ok = false, error = 'not_found' }
     end
+    if finishing[src] then return { ok = false, error = 'cooking_busy' } end
     if GetGameTimer() < session.deadline then return { ok = false, error = 'cooking_not_ready' } end
     if GetGameTimer() > session.deadline + 30000 then
         active[src] = nil
