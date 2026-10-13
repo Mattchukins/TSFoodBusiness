@@ -71,6 +71,13 @@ local function handleRequest(src, request)
         or request.action == 'setStaffDuty' or request.action == 'updateStaffMember' or request.action == 'removeStaffMember' then
         respond(src, request.requestId, Staff.handle(src, person.id, request.action, request.data)); return
     end
+    if request.action == 'startConventionalCooking' then
+        local data = request.data
+        if not exactKeys(data, { businessId = true, recipeId = true, stationId = true, batches = true }) then
+            respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+        end
+        respond(src, request.requestId, ConventionalCooking.start(src, person.id, data)); return
+    end
     local jobActions = { listCookingJobs = 'list', startCookingJob = 'start',
         finishCookingJob = 'finish', cancelCookingJob = 'cancel',
         inspectCookingJob = 'inspect', resumeCookingJob = 'resume' }
@@ -591,7 +598,7 @@ exports('GetOwnerProductionReadiness', function(src, businessId, recipeId, stati
 end)
 
 if CookingJobs then
-    CookingJobs.configure({
+    local cookingDependencies = {
         plan = getOwnerProductionPlan,
         owner = function(src, actor, businessId)
             if not ready then return false end
@@ -610,7 +617,9 @@ if CookingJobs then
             local coords = GetEntityCoords(ped)
             return coords ~= nil and FoodBusiness.isNearStation(station, coords.x, coords.y, coords.z, GetPlayerRoutingBucket(src), 2.0)
         end,
-    })
+    }
+    CookingJobs.configure(cookingDependencies)
+    ConventionalCooking.configure(cookingDependencies)
 end
 
 exports('GetBusinessStaffRole', function(src, businessId)
