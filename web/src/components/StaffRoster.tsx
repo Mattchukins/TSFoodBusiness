@@ -72,7 +72,7 @@ export function StaffRoster({ businessId, request, busy, onBusy }: {
   const filtered = members.filter(member => member.display_name.toLowerCase().includes(search.trim().toLowerCase()))
   return <section aria-label="Business staff roster">
     <p>Assign an online character using their current server ID. The roster keeps their character assignment after disconnects. Labels can be edited while staff are offline.</p>
-    <p>Staff can change their own status in My duty; owners can also change it here. Status persists until changed. Shift start/end times are recorded. Disconnects do not clock staff out automatically.</p>
+    <p>Staff can change their own status in My duty; owners can also change it here. Status persists until changed. Shift start/end times are recorded. Confirmed self-service shifts close on disconnect during this resource run; owner-started or recovered shifts need review.</p>
     <p>Roles are saved for permission integrations. Staff access to this management interface and cooking is still being developed.</p>
     {state === 'loading' && <p role="status">Loading staff roster…</p>}
     {state === 'ready' && <>

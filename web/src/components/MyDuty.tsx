@@ -26,7 +26,7 @@ export function MyDuty({ request, busy, onBusy }: { request: (action: string, pa
     } catch { setState('error'); setMessage('The server did not respond. Reload to verify your saved duty status.') }
     finally { onBusy(false) }
   }
-  return <section aria-label="My duty status"><p>Start or end your shift at a business where this character is on the staff roster. Disconnecting does not end a shift automatically.</p>
+  return <section aria-label="My duty status"><p>Start or end your shift at a business where this character is on the staff roster. Confirmed shifts started here close on disconnect during this resource run. After a resource restart or an uncertain save, review and end any shift still shown as open.</p>
     {state === 'loading' && <p role="status">Loading duty status…</p>}
     {state === 'ready' && (businesses.length ? <ul className="p-0">{businesses.map(business => <li key={business.id} className="my-3 list-none rounded-lg border border-solid border-border p-3"><p><strong>{business.name}</strong> · {business.role} · {Number(business.on_duty) === 1 ? 'On duty' : 'Off duty'}</p><button type="button" disabled={busy} onClick={() => void change(business)}>{Number(business.on_duty) === 1 ? 'End shift' : 'Start shift'} at {business.name}</button></li>)}</ul> : <p>This character has no staff assignments.</p>)}
     <button type="button" disabled={busy || state === 'loading'} onClick={() => setReload(value => value + 1)}>Reload my duty status</button><p role="status" aria-live="polite">{message}</p>

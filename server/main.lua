@@ -479,7 +479,13 @@ RegisterNetEvent('tsfb:request', function(request)
     end
 end)
 
-AddEventHandler('playerDropped', function() requestWindows[source] = nil end)
+AddEventHandler('playerDropped', function()
+    local src = source
+    requestWindows[src] = nil
+    if Staff and not Staff.disconnect(src) then
+        print('[ts-foodbusiness] staff disconnect cleanup failed; owner must review saved duty and shift status')
+    end
+end)
 
 -- Server-only integration contract. Values describe configuration, never availability or stock.
 local function getBusinessOperations(businessId)

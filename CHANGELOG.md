@@ -92,3 +92,5 @@
 - Added server-timed shift snapshots and owner-scoped recent history in the Staff roster. Duty, shift and audit writes are transactional with one active shift per staff entry.
 - Staff removal closes an active shift and preserves historical label/role snapshots. No fabricated start times are added to older duty flags.
 - Disconnect clock-out, payroll and gameplay delegation remain pending. Local tests/build pass; live MySQL/FiveM verification remains pending.
+
+- Added disconnect closure for exact confirmed self-service shift IDs, with transactional duty/audit/history updates and newer-shift protection. Owner-started, uncertain and restart-surviving shifts still require review. Added mocked drop/replay/failure tests; live runtime verification remains pending.

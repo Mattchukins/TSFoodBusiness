@@ -1,4 +1,5 @@
 Staff = {}
+local selfShifts = {}
 local function text(value, maximum)
     return type(value) == 'string' and #value >= 2 and #value <= maximum and not value:find('[%c]')
 end
@@ -111,6 +112,11 @@ function Staff.handle(src, actor, action, data)
         }) end)
         if not ok or not done then return { ok = false, error = 'transaction_failed' } end
         local saved = MySQL.single.await('SELECT on_duty, revision FROM tsfb_staff_duty WHERE staff_id = ?', { data.staffId })
+        if selfDuty and saved and tonumber(saved.revision) == revision then
+            selfShifts[src] = selfShifts[src] or {}
+            if data.onDuty then selfShifts[src][data.staffId] = { id = shiftId, actor = actor }
+            else selfShifts[src][data.staffId] = nil end
+        end
         return saved and tonumber(saved.revision) == revision and tonumber(saved.on_duty) == (data.onDuty and 1 or 0)
             and { ok = true } or { ok = false, error = 'staff_conflict' }
     end
@@ -160,4 +166,29 @@ function Staff.handle(src, actor, action, data)
     local updated = MySQL.single.await('SELECT id, revision FROM tsfb_staff WHERE id = ? AND business_id = ?', { data.staffId, data.businessId })
     if removing then return not updated and { ok = true } or { ok = false, error = 'staff_conflict' } end
     return updated and tonumber(updated.revision) == revision and { ok = true } or { ok = false, error = 'staff_conflict' }
+end
+
+-- Bind cleanup to exact confirmed self-service shift IDs, never recycled source IDs.
+function Staff.disconnect(src)
+    local tracked = selfShifts[src]
+    selfShifts[src] = nil
+    if not tracked then return true end
+    local now = os.time()
+    if not integer(now, 1, 2147483647) then return false end
+    local allClosed = true
+    for staffId, session in pairs(tracked) do
+        local ok, closed = pcall(function()
+            local row = MySQL.single.await('SELECT d.revision, s.business_id FROM tsfb_staff_duty d JOIN tsfb_staff s ON s.id = d.staff_id JOIN tsfb_staff_shifts h ON h.staff_slot = s.id WHERE s.id = ? AND s.member_id = ? AND h.id = ? AND d.on_duty = 1', { staffId, session.actor, session.id })
+            if not row then return true end -- Already ended, removed or replaced.
+            local revision = tonumber(row.revision)
+            if not integer(revision, 0, 2147483646) then return false end
+            return MySQL.transaction.await({
+                { query = 'UPDATE tsfb_staff_duty SET on_duty = 0, revision = revision + 1 WHERE staff_id = ? AND revision = ? AND on_duty = 1 AND EXISTS (SELECT 1 FROM tsfb_staff_shifts WHERE id = ? AND staff_slot = ?)', values = { staffId, revision, session.id, staffId } },
+                { query = 'INSERT INTO tsfb_audit (action, actor_id, business_id, correlation_id, details) SELECT ?, ?, ?, ?, ? FROM tsfb_staff_duty WHERE staff_id = ? AND revision = ? AND on_duty = 0', values = { 'staff.disconnect', session.actor, row.business_id, 'duty:' .. staffId .. ':' .. (revision + 1), json.encode({ staffId = staffId, shiftId = session.id, reason = 'disconnect' }), staffId, revision + 1 } },
+                { query = 'UPDATE tsfb_staff_shifts SET ended_at = GREATEST(started_at, ?), end_reason = ?, staff_slot = NULL WHERE id = ? AND staff_slot = ? AND EXISTS (SELECT 1 FROM tsfb_staff_duty WHERE staff_id = ? AND revision = ? AND on_duty = 0)', values = { now, 'disconnect', session.id, staffId, staffId, revision + 1 } },
+            })
+        end)
+        allClosed = allClosed and ok and closed == true
+    end
+    return allClosed
 end

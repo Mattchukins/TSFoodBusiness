@@ -43,7 +43,7 @@ This queue responds to the requested 50-stage continuation. These are implementa
 | 37 | Visual zone placement | Pending |
 | 38 | Staff role and permission storage | Schema 7 roster, role registry and guarded permission exports implemented; delegated gameplay/live SQL pending |
 | 39 | Staff assignment and removal | Owner-only server-resolved assignment, revisioned edit/removal and React/Tailwind roster implemented; live verification pending |
-| 40 | Duty/shift tracking | Owner/self-service duty and schema 9 shift history implemented with revision/audit checks; automatic disconnect closure and live verification pending |
+| 40 | Duty/shift tracking | Owner/self-service duty and schema 9 shift history implemented with revision/audit checks; confirmed self-service shifts close on disconnect in the current resource run; restart/owner-started recovery and live verification pending |
 | 41 | Supplier purchase-order storage | Pending |
 | 42 | Supplier receiving and stock ledger | Pending |
 | 43 | Standalone business account ledger | Pending |
