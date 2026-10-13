@@ -105,8 +105,10 @@ local function productionOperation(operation, job)
         or (receipt.state ~= 'absent' and receipt.state ~= 'reserved' and receipt.state ~= 'committed' and receipt.state ~= 'released') then
         return nil, 'inventory_outcome_unknown'
     end
-    if receipt.error ~= nil and not ((receipt.error == 'insufficient_stock' and receipt.state == 'absent')
-        or (receipt.error == 'output_full' and receipt.state == 'reserved')) then
+    -- Business failures are valid only for the operation that can produce them.
+    -- Inspect/release must never smuggle a mutation failure into reconciliation.
+    if receipt.error ~= nil and not ((operation == 'reserve' and receipt.error == 'insufficient_stock' and receipt.state == 'absent')
+        or (operation == 'commit' and receipt.error == 'output_full' and receipt.state == 'reserved')) then
         return nil, 'inventory_outcome_unknown'
     end
     return { state = receipt.state, error = receipt.error }
