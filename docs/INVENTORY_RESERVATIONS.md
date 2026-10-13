@@ -1,3 +1,19 @@
+### Conventional cooking implementation boundary
+
+A standard ox_inventory cooking mode should validate the recipe, business
+permission, station proximity, quantities, output capacity, and a per-player
+action lock on the server. It should consume ingredients through upstream
+ox_inventory exports and award outputs only after successful removal. Failed
+removals must never award output. If output delivery fails after removal, the
+server must attempt restoration, log the incident and hold the job for operator
+review if restoration cannot be confirmed. Such compensation is **not atomic**
+and cannot guarantee crash recovery between independent ox_inventory calls.
+
+Do not reuse the durable job engine's `atomicProduction` capability flag for
+this weaker mode. Introduce a separate explicitly named conventional mode with
+its own state machine and tests before enabling cooking. Keep any SQL escrow
+and stock procedures isolated from the default player-inventory path.
+
 ## Standard ox_inventory default (simplified architecture)
 
 The default `FoodBusiness.Inventory.provider = 'ox_inventory'` connects **directly**
