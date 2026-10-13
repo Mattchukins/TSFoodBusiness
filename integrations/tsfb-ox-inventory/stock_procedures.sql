@@ -45,7 +45,12 @@ BEGIN
  END IF;
  SET v_output_item=JSON_UNQUOTE(JSON_EXTRACT(p_plan,'$.outputItem'));
  SET v_output_quantity=CAST(JSON_UNQUOTE(JSON_EXTRACT(p_plan,'$.outputQuantity')) AS UNSIGNED);
- IF v_output_item IS NULL OR v_output_item NOT REGEXP '^[a-zA-Z0-9_-]{2,64}
+ IF v_output_item IS NULL OR v_output_item NOT REGEXP '^[a-zA-Z0-9_-]{2,64}$'
+    OR v_output_quantity IS NULL OR v_output_quantity NOT BETWEEN 1 AND 100000 THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='invalid_output';
+ END IF;
+ START TRANSACTION;
+ INSERT IGNORE INTO tsfb_ox_production_receipts
   (job_id,owner_id,plan_key,plan_json,state)
  VALUES(p_job,p_owner,p_key,p_plan,'intent');
  SET v_done=FALSE;
