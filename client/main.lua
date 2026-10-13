@@ -175,7 +175,7 @@ local function refreshCookingTargets()
         for _, target in ipairs(result.targets) do
             if type(target.x) == 'number' and type(target.y) == 'number'
                 and type(target.z) == 'number'
-                and (target.routingBucket == nil or target.routingBucket == GetPlayerRoutingBucket(PlayerId())) then
+                then
                 local zone = exports[GetCurrentResourceName()]:RegisterCookingStation({
                     businessId = target.businessId, recipeId = target.recipeId,
                     stationId = target.stationId,
