@@ -18,6 +18,7 @@ jobs:
       - run: lua5.4 tests/stations.lua
       - run: lua5.4 tests/production.lua
       - run: lua5.4 tests/inventory.lua
+      - run: lua5.4 tests/conventional_cooking.lua
       - run: lua5.4 tests/jobs.lua
       - run: lua5.4 tests/jobs_requests.lua
       - run: lua5.4 tests/staff.lua
