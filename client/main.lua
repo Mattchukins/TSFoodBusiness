@@ -238,7 +238,8 @@ refreshCookingTargets = function()
         local signature = table.concat(signatureParts, '|')
         if signature == automaticTargetSignature then return end
         clearAutomaticZones()
-        automaticTargetSignature = signature
+        local registered = 0
+        local eligible = 0
         for _, target in ipairs(result.targets) do
             if type(target.x) == 'number' and type(target.y) == 'number'
                 and type(target.z) == 'number'
@@ -246,15 +247,20 @@ refreshCookingTargets = function()
                 and math.abs(target.x) < 100000 and math.abs(target.y) < 100000
                 and math.abs(target.z) < 100000
                 then
+                eligible = eligible + 1
                 local zone = exports[GetCurrentResourceName()]:RegisterCookingStation({
                     businessId = target.businessId, recipeId = target.recipeId,
                     stationId = target.stationId,
                     coords = vector3(target.x, target.y, target.z),
                     label = 'Prepare ' .. tostring(target.recipeName or 'food'),
                 })
-                if zone then automaticZones[#automaticZones + 1] = zone end
+                if zone then
+                    automaticZones[#automaticZones + 1] = zone
+                    registered = registered + 1
+                end
             end
         end
+        if registered == eligible then automaticTargetSignature = signature end
     end)
 end
 RegisterCommand('foodbusiness_refresh_cooking', refreshCookingTargets, false)
