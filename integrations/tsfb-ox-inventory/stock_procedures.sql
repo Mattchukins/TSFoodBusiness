@@ -146,7 +146,7 @@ BEGIN
  END IF;
  IF v_state='reserved' THEN
   INSERT INTO tsfb_ox_stock(owner_id,item,quantity)
-   SELECT p_owner,item,quantity FROM tsfb_ox_escrow WHERE job_id=p_job
+   SELECT p_owner,e.item,e.quantity FROM tsfb_ox_escrow AS e WHERE e.job_id=p_job
    ON DUPLICATE KEY UPDATE quantity=tsfb_ox_stock.quantity+VALUES(quantity);
   DELETE FROM tsfb_ox_escrow WHERE job_id=p_job;
   UPDATE tsfb_ox_production_receipts SET state='released',revision=revision+1
