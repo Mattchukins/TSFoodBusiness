@@ -213,3 +213,10 @@ end)
 RegisterNetEvent('tsfb:refreshCookingTargets', function()
     refreshCookingTargets()
 end)
+
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= GetCurrentResourceName() then return end
+    if GetResourceState('ox_target') == 'started' then
+        for zone in pairs(targetZones) do exports.ox_target:removeZone(zone) end
+    end
+end)
