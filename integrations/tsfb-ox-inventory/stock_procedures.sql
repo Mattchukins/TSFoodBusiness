@@ -19,6 +19,7 @@ BEGIN
  DECLARE v_changed BIGINT DEFAULT 0;
  DECLARE v_expected INT DEFAULT 0;
  DECLARE v_seen INT DEFAULT 0;
+ DECLARE v_json_type VARCHAR(20);
  DECLARE c CURSOR FOR
   SELECT item, quantity FROM JSON_TABLE(p_plan, '$.ingredients[*]'
    COLUMNS(item VARCHAR(64) PATH '$.item', quantity BIGINT PATH '$.quantity')) AS i
@@ -100,6 +101,10 @@ BEGIN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='reservation_conflict';
  END IF;
  IF v_state='reserved' THEN
+  SET v_json_type=JSON_TYPE(JSON_EXTRACT(v_plan,'$.outputQuantity'));
+  IF v_json_type IS NULL OR v_json_type <> 'INTEGER' THEN
+   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='invalid_output';
+  END IF;
   SET v_item=JSON_UNQUOTE(JSON_EXTRACT(v_plan,'$.outputItem'));
   SET v_qty=CAST(JSON_UNQUOTE(JSON_EXTRACT(v_plan,'$.outputQuantity')) AS UNSIGNED);
   IF v_item IS NULL OR v_item NOT REGEXP '^[a-zA-Z0-9_-]{2,64}
