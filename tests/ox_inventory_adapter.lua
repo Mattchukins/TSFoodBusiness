@@ -29,6 +29,10 @@ started = false
 assert(callbacks.ItemExists('flour') == false)
 assert(callbacks.GetItemCount(42, 'flour') == nil)
 started = true
+local originalItems = exports.ox_inventory.Items
+exports.ox_inventory.Items = function() error('catalogue unavailable') end
+assert(callbacks.ItemExists('flour') == nil)
+exports.ox_inventory.Items = originalItems
 local original = exports.ox_inventory.GetItemCount
 exports.ox_inventory.GetItemCount = function() error('provider offline') end
 assert(callbacks.GetItemCount(42, 'flour') == nil)
