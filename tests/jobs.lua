@@ -107,6 +107,11 @@ near = false; assert(start('request-0001').error == 'station_not_near' and reser
 near = true; owned = false; assert(start('request-0001').error == 'forbidden' and reserves == 0)
 owned = true; transactionFails = true; assert(start('request-0001').error == 'job_conflict_or_database_error' and reserves == 0)
 transactionFails = false
+-- Unsupported actions must never consult the provider or mutate pending jobs.
+inspectThrows = true
+assert(act(businessId, 'unsupported').error == 'invalid_action')
+inspectThrows = false
+assert(CookingJobs.act(42, actor, nil, 'inspect').error == 'invalid_payload')
 local started = start('request-0001'); assert(started.ok and started.job.state == 'cooking' and started.job.readyAt == 1090)
 local id = started.job.id
 assert(start('request-0001').job.id == id and reserves == 1)
