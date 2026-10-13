@@ -1,5 +1,7 @@
 -- ox_inventory integration. Only read exports are exposed until a provider can
 -- guarantee atomic, durable ingredient escrow and output delivery.
+local Journal = LoadResourceFile and assert(load(LoadResourceFile(GetCurrentResourceName(), 'journal.lua'), '@journal.lua'))() or dofile('integrations/tsfb-ox-inventory/journal.lua')
+
 local function validItem(item)
     return type(item) == 'string' and #item >= 2 and #item <= 64
         and item:match('^[%w_%-]+$') ~= nil
@@ -40,4 +42,8 @@ end
 exports('InspectProductionReservation', unsupported)
 exports('ReserveProduction', unsupported)
 exports('CommitProduction', unsupported)
-exports('ReleaseProduction', unsupported)
+exports('ReleaseProduction', function(payload)
+    local receipt, reason = Journal.releaseAbsent(payload)
+    if not receipt then error(reason or 'journal_unavailable') end
+    return receipt
+end)
