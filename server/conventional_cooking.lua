@@ -146,12 +146,18 @@ end
 local active = {}
 local beginning = {}
 local finishing = {}
+local generation = {}
 function ConventionalCooking.begin(src, actor, data)
     if active[src] and GetGameTimer() > active[src].deadline + 30000 then active[src] = nil end
     if active[src] or beginning[src] or finishing[src] or busy[src] then return { ok = false, error = 'cooking_busy' } end
     beginning[src] = true
+    local generationAtStart = generation[src] or 0
     local ok, resolved = pcall(ConventionalCooking.resolve, src, actor, data)
     if not ok then resolved = { ok = false, error = 'cooking_unavailable' } end
+    if generationAtStart ~= (generation[src] or 0) then
+        beginning[src] = nil
+        return { ok = false, error = 'player_disconnected' }
+    end
     if not resolved.ok then beginning[src] = nil; return resolved end
     local plan = resolved.plan
     if type(plan.durationSeconds) ~= 'number' or plan.durationSeconds ~= math.floor(plan.durationSeconds)
@@ -180,6 +186,10 @@ function ConventionalCooking.begin(src, actor, data)
     if canCarry ~= true then
         beginning[src] = nil
         return { ok = false, error = canCarry == nil and (capacityError or 'inventory_unavailable') or 'output_full' }
+    end
+    if generationAtStart ~= (generation[src] or 0) then
+        beginning[src] = nil
+        return { ok = false, error = 'player_disconnected' }
     end
     local token = ('%d-%d-%d'):format(src, GetGameTimer(), math.random(100000, 999999))
     active[src] = { token = token, actor = actor, data = data, plan = plan,
@@ -216,6 +226,7 @@ function ConventionalCooking.cancel(src, token)
     return { ok = true }
 end
 function ConventionalCooking.drop(src)
+    generation[src] = (generation[src] or 0) + 1
     active[src] = nil
     beginning[src] = nil
 end
