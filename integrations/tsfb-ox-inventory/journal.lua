@@ -37,4 +37,31 @@ function Journal.inspect(jobId)
     }
 end
 
+-- Only an absent claim can be safely tombstoned without touching ox_inventory.
+-- This does not implement ingredient escrow or output delivery.
+function Journal.releaseAbsent(payload)
+    if type(payload) ~= 'table' or not validId(payload.jobId)
+        or type(payload.ownerId) ~= 'string' or #payload.ownerId < 2 or #payload.ownerId > 80
+        or type(payload.planKey) ~= 'string' or #payload.planKey < 1 or #payload.planKey > 1600
+        or type(payload.plan) ~= 'table' then return nil, 'invalid_payload' end
+    local encodedOk, planJson = pcall(json.encode, payload.plan)
+    if not encodedOk or type(planJson) ~= 'string' or #planJson > 65535 then return nil, 'invalid_payload' end
+    if not MySQL or not MySQL.update or not MySQL.update.await then return nil, 'database_unavailable' end
+    local ok = pcall(function()
+        MySQL.update.await(
+            "INSERT IGNORE INTO tsfb_ox_production_receipts (job_id, owner_id, plan_key, plan_json, state) VALUES (?, ?, ?, ?, 'released')",
+            { payload.jobId, payload.ownerId, payload.planKey, planJson }
+        )
+    end)
+    if not ok then return nil, 'database_unavailable' end
+    local receipt, reason = Journal.inspect(payload.jobId)
+    if not receipt then return nil, reason end
+    if not receipt.found or receipt.ownerId ~= payload.ownerId
+        or receipt.planKey ~= payload.planKey or receipt.state ~= 'released' then
+        return nil, 'reservation_conflict'
+    end
+    return { jobId = payload.jobId, ownerId = payload.ownerId,
+        planKey = payload.planKey, state = 'released' }
+end
+
 return Journal
