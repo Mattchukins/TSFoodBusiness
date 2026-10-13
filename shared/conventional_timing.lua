@@ -30,3 +30,28 @@ function ConventionalTiming.sameRequest(previous, actor, data)
         and previous.request_token == data.token
         and previous.batches == data.batches
 end
+
+-- The state machine is deterministic; persistence must compare-and-swap
+-- the revision and write the audit event in the same DB transaction.
+ConventionalTiming.States = {
+    queued = true, cooking = true, committing = true,
+    completed = true, cancelled = true, recovery_required = true,
+}
+local transitions = {
+    queued = { cooking = true, cancelled = true, recovery_required = true },
+    cooking = { committing = true, cancelled = true, recovery_required = true },
+    committing = { completed = true, recovery_required = true },
+    recovery_required = { completed = true, cancelled = true },
+}
+function ConventionalTiming.transition(state, target, revision, now, deadline)
+    if not ConventionalTiming.States[state] or not ConventionalTiming.States[target]
+        or not transitions[state] or not transitions[state][target]
+        or not whole(revision, 0, 2147483646) then return nil end
+    if target == 'committing' and ConventionalTiming.ready(now, deadline) ~= true then
+        return nil
+    end
+    return { state = target, revision = revision + 1 }
+end
+function ConventionalTiming.terminal(state)
+    return state == 'completed' or state == 'cancelled'
+end
