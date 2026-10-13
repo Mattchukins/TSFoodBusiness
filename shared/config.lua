@@ -17,7 +17,10 @@ FoodBusiness.Modules = {
 }
 
 -- Custom adapter exports are a TSFoodBusiness contract, not an assumed provider API.
-FoodBusiness.Inventory = { provider = 'disabled', resource = '', itemExistsExport = 'ItemExists', countExport = 'GetItemCount' }
+-- Default: standard upstream ox_inventory, no TSFB inventory adapter or
+-- inventory-specific SQL schema required for item lookup and recipe previews.
+-- Cooking mutations remain gated until a safe implementation is verified.
+FoodBusiness.Inventory = { provider = 'ox_inventory', resource = 'ox_inventory', itemExistsExport = 'Items', countExport = 'GetItemCount' }
 
 -- Explicit operator opt-in only after live adapter/recovery verification.
 -- The provider must satisfy docs/INVENTORY_RESERVATIONS.md atomically and durably.
