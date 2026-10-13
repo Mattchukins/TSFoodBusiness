@@ -169,7 +169,7 @@ exports('RegisterCookingStation', function(config)
     local batches = config.batches or 1
     if type(batches) ~= 'number' or batches ~= math.floor(batches)
         or batches < 1 or batches > 100 then return false end
-    local zone = exports.ox_target:addSphereZone({
+    local ok, zone = pcall(function() return exports.ox_target:addSphereZone({
         coords = config.coords, radius = 1.5, debug = false,
         options = {{
             name = 'tsfb_cook_' .. config.stationId .. '_' .. config.recipeId,
@@ -181,8 +181,8 @@ exports('RegisterCookingStation', function(config)
                     config.businessId, config.recipeId, config.stationId, batches)
             end,
         }},
-    })
-    if not zone then return false end
+    }) end)
+    if not ok or not zone then return false end
     targetZones[zone] = true
     return zone
 end)
@@ -190,7 +190,7 @@ exports('RemoveCookingStation', function(zone)
     if not targetZones[zone] then return false end
     targetZones[zone] = nil
     if GetResourceState('ox_target') == 'started' then
-        exports.ox_target:removeZone(zone)
+        pcall(function() exports.ox_target:removeZone(zone) end)
     end
     return true
 end)
@@ -290,7 +290,9 @@ end)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= GetCurrentResourceName() then return end
     if GetResourceState('ox_target') == 'started' then
-        for zone in pairs(targetZones) do exports.ox_target:removeZone(zone) end
+        for zone in pairs(targetZones) do
+            pcall(function() exports.ox_target:removeZone(zone) end)
+        end
     end
 end)
 
