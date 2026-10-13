@@ -23,6 +23,7 @@ jobs:
       - run: lua5.4 tests/staff.lua
       - run: lua5.4 tests/staff_disconnect.lua
       - run: lua5.4 tests/inventory_mutations.lua
+      - run: lua5.4 tests/inventory_stateful_contract.lua
       - run: python3 tests/sql_contract.py
   nui:
     runs-on: ubuntu-latest
