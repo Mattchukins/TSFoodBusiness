@@ -79,3 +79,44 @@ AddEventHandler('onResourceStop', function(resource)
         SetNuiFocus(false, false)
     end
 end)
+
+-- Station integrations may call exports['ts-foodbusiness']:CookRecipe(...)
+local cooking = false
+local function ask(action, data, callback)
+    sequence = sequence + 1
+    local id = ('cook-%d-%d'):format(GetGameTimer(), sequence)
+    pending[id] = callback
+    pendingCount = pendingCount + 1
+    TriggerServerEvent('tsfb:request', { requestId = id, action = action, data = data })
+    SetTimeout(10000, function()
+        if pending[id] then
+            pending[id]({ ok = false, error = 'timeout' })
+            pending[id] = nil
+            pendingCount = pendingCount - 1
+        end
+    end)
+end
+exports('CookRecipe', function(businessId, recipeId, stationId, batches)
+    if cooking or pendingCount >= 10 then return false end
+    cooking = true
+    ask('beginCooking', { businessId = businessId, recipeId = recipeId,
+        stationId = stationId, batches = batches or 1 }, function(start)
+        if not start or not start.ok then
+            cooking = false
+            lib.notify({ type = 'error', description = start and start.error or 'Cooking unavailable' })
+            return
+        end
+        local completed = lib.progressBar({
+            duration = start.durationMs, label = 'Preparing food',
+            canCancel = true, disable = { move = true, car = true, combat = true },
+        })
+        ask(completed and 'finishCooking' or 'cancelCooking', { token = start.token }, function(result)
+            cooking = false
+            if completed then
+                lib.notify({ type = result and result.ok and 'success' or 'error',
+                    description = result and (result.ok and 'Food prepared' or result.error) or 'Cooking failed' })
+            end
+        end)
+    end)
+    return true
+end)
