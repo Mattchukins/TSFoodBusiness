@@ -166,6 +166,8 @@ exports('RegisterCookingStation', function(config)
         or type(config.coords) ~= 'vector3' or GetResourceState('ox_target') ~= 'started' then
         return false
     end
+    if type(config.label) ~= 'nil' and (type(config.label) ~= 'string'
+        or #config.label > 120) then return false end
     local batches = config.batches or 1
     if type(batches) ~= 'number' or batches ~= math.floor(batches)
         or batches < 1 or batches > 100 then return false end
