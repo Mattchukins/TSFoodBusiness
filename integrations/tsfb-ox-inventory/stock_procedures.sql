@@ -44,7 +44,7 @@ BEGIN
  SET v_done=FALSE;
  SELECT state,owner_id,plan_key INTO v_state,v_owner,v_key
  FROM tsfb_ox_production_receipts WHERE job_id=p_job FOR UPDATE;
- IF v_owner <> p_owner OR BINARY v_key <> BINARY p_key THEN
+ IF v_owner IS NULL OR v_owner <> p_owner OR v_key IS NULL OR BINARY v_key <> BINARY p_key THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='reservation_conflict';
  END IF;
  IF v_state='intent' THEN
@@ -99,7 +99,7 @@ BEGIN
  SELECT state,owner_id,plan_key,plan_json,revision
  INTO v_state,v_owner,v_key,v_plan,v_rev
  FROM tsfb_ox_production_receipts WHERE job_id=p_job FOR UPDATE;
- IF v_owner <> p_owner OR BINARY v_key <> BINARY p_key THEN
+ IF v_owner IS NULL OR v_owner <> p_owner OR v_key IS NULL OR BINARY v_key <> BINARY p_key THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='reservation_conflict';
  END IF;
  IF v_state='reserved' THEN
