@@ -71,10 +71,13 @@ stock.flour, stock.water = 3, 2
 local started = ConventionalCooking.begin(1, 'owner', request)
 assert(started.ok and started.durationMs == 2000)
 assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_busy')
+assert(ConventionalCooking.finish(1, 'different-owner', started.token).error == 'not_found')
+assert(ConventionalCooking.cancel(1, 'wrong-token').error == 'not_found')
 assert(ConventionalCooking.finish(1, 'owner', started.token).error == 'cooking_not_ready')
 now = 3000
 assert(ConventionalCooking.finish(1, 'owner', started.token).ok)
 assert(ConventionalCooking.finish(1, 'owner', started.token).error == 'not_found')
+assert(ConventionalCooking.cancel(1, started.token).error == 'not_found')
 local cancelled = ConventionalCooking.begin(1, 'owner', request)
 assert(cancelled.ok and ConventionalCooking.cancel(1, cancelled.token).ok)
 assert(ConventionalCooking.finish(1, 'owner', cancelled.token).error == 'not_found')
