@@ -26,7 +26,7 @@ assert(callbacks.GetItemCount(42, 'flour') == 8)
 assert(callbacks.GetItemCount(42, 'unknown') == 0)
 assert(callbacks.GetItemCount(0, 'flour') == nil)
 started = false
-assert(callbacks.ItemExists('flour') == false)
+assert(callbacks.ItemExists('flour') == nil)
 assert(callbacks.GetItemCount(42, 'flour') == nil)
 started = true
 local originalItems = exports.ox_inventory.Items
