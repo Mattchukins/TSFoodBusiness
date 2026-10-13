@@ -8,7 +8,7 @@ description 'Modular hospitality platform (bootstrap)'
 version '0.8.0-dev'
 
 dependencies { 'oxmysql', 'ox_lib' }
-shared_scripts { '@ox_lib/init.lua', 'shared/config.lua', 'shared/operations.lua', 'shared/presets.lua', 'shared/recipes.lua', 'shared/stations.lua', 'shared/jobs.lua', 'shared/staff.lua' }
+shared_scripts { '@ox_lib/init.lua', 'shared/config.lua', 'shared/operations.lua', 'shared/presets.lua', 'shared/recipes.lua', 'shared/stations.lua', 'shared/jobs.lua', 'shared/conventional_timing.lua', 'shared/staff.lua' }
 client_scripts { 'client/main.lua' }
 server_scripts { '@oxmysql/lib/MySQL.lua', 'bridges/framework.lua', 'bridges/inventory.lua', 'server/schema.lua', 'server/jobs.lua', 'server/conventional_cooking.lua', 'server/staff.lua', 'server/main.lua' }
 
