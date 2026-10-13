@@ -124,6 +124,7 @@ exports('CookRecipe', function(businessId, recipeId, stationId, batches)
         end
         if type(start.token) ~= 'string' or type(start.durationMs) ~= 'number'
             or start.durationMs < 1000 or start.durationMs > 3600000 then
+            ask('cancelCooking', { token = type(start.token) == 'string' and start.token or '' }, function() end)
             cooking = false
             lib.notify({ type = 'error', description = 'Invalid cooking response' })
             return
