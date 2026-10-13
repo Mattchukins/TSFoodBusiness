@@ -39,6 +39,27 @@ end
 
 -- Only an absent claim can be safely tombstoned without touching ox_inventory.
 -- This does not implement ingredient escrow or output delivery.
+function Journal.inspectReceipt(payload)
+    if type(payload) ~= 'table' or not validId(payload.jobId)
+        or type(payload.ownerId) ~= 'string' or #payload.ownerId < 2 or #payload.ownerId > 80
+        or type(payload.planKey) ~= 'string' or #payload.planKey < 1 or #payload.planKey > 1600 then
+        return nil, 'invalid_payload'
+    end
+    local record, reason = Journal.inspect(payload.jobId)
+    if not record then return nil, reason end
+    if not record.found then
+        return { jobId = payload.jobId, ownerId = payload.ownerId,
+            planKey = payload.planKey, state = 'absent' }
+    end
+    if record.ownerId ~= payload.ownerId or record.planKey ~= payload.planKey then
+        return nil, 'reservation_conflict'
+    end
+    -- Intent is not a provider receipt. It requires manual reconciliation.
+    if record.state == 'intent' then return nil, 'reservation_unresolved' end
+    return { jobId = payload.jobId, ownerId = payload.ownerId,
+        planKey = payload.planKey, state = record.state }
+end
+
 function Journal.releaseAbsent(payload)
     if type(payload) ~= 'table' or not validId(payload.jobId)
         or type(payload.ownerId) ~= 'string' or #payload.ownerId < 2 or #payload.ownerId > 80
