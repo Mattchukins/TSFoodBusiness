@@ -9,4 +9,4 @@ version '0.1.0'
 
 dependencies { 'ox_inventory', 'oxmysql' }
 server_scripts { '@oxmysql/lib/MySQL.lua', 'server.lua', 'stock_provider.lua' }
-files { 'journal.lua', 'stock_engine.lua' }
+files { 'journal.lua', 'stock_engine.lua', 'reconciliation.lua' }
