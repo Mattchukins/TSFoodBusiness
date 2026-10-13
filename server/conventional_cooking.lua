@@ -170,6 +170,10 @@ function ConventionalCooking.begin(src, actor, data)
         beginning[src] = nil
         return { ok = false, error = 'inventory_unavailable' }
     end
+    if generationAtStart ~= (generation[src] or 0) then
+        beginning[src] = nil
+        return { ok = false, error = 'player_disconnected' }
+    end
     if not inspection then
         beginning[src] = nil
         return { ok = false, error = inspectError or 'inventory_unavailable' }
