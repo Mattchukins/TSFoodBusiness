@@ -26,6 +26,14 @@ state = 'reserved'; assert(Inventory.reserve(job).state == 'reserved')
 errorCode = 'output_full'; assert(Inventory.commit(job).error == 'output_full')
 state = 'committed'; assert(Inventory.commit(job) == nil) -- Contradictory error and terminal state.
 errorCode = nil; assert(Inventory.commit(job).state == 'committed')
+state = 'absent'; errorCode = 'insufficient_stock'
+assert(Inventory.reserve(job).error == 'insufficient_stock')
+assert(Inventory.inspectReservation(job) == nil) -- Inspect cannot return reserve failure.
+assert(Inventory.release(job) == nil) -- Release cannot return reserve failure.
+state = 'reserved'; errorCode = 'output_full'
+assert(Inventory.commit(job).error == 'output_full')
+assert(Inventory.reserve(job) == nil) -- Reserve cannot return commit failure.
+errorCode = nil
 state = 'released'; assert(Inventory.release(job).state == 'released')
 wrong = true; local result, reason = Inventory.inspectReservation(job)
 assert(result == nil and reason == 'inventory_outcome_unknown')
