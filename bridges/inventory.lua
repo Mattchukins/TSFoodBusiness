@@ -20,6 +20,18 @@ local function mutationProvider()
     for _, key in ipairs({ 'inspectExport', 'reserveExport', 'commitExport', 'releaseExport' }) do
         if type(config[key]) ~= 'string' or not config[key]:match('^[%w_]+$') then return nil end
     end
+    -- The stock ox adapter has no atomic mutation engine. A configuration
+    -- override must never turn its disabled exports into advertised capability.
+    if config.resource == 'tsfb-ox-inventory' then
+        local ok, claims = pcall(function()
+            local proxy = exports[config.resource]
+            return proxy.ProductionMutationCapabilities(proxy)
+        end)
+        if not ok or type(claims) ~= 'table'
+            or claims.atomicProduction ~= true or claims.durableEscrow ~= true
+            or claims.atomicOutput ~= true or claims.restartReconciliation ~= true
+            or claims.liveVerified ~= true then return nil end
+    end
     return config
 end
 function Inventory.capabilities()
