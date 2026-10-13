@@ -71,15 +71,25 @@ local function handleRequest(src, request)
         or request.action == 'setStaffDuty' or request.action == 'updateStaffMember' or request.action == 'removeStaffMember' then
         respond(src, request.requestId, Staff.handle(src, person.id, request.action, request.data)); return
     end
-    if request.action == 'startConventionalCooking' then
-        local data = request.data
-        if not exactKeys(data, { businessId = true, recipeId = true, stationId = true, batches = true }) then
-            respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
-        end
+    if request.action == 'beginCooking' or request.action == 'finishCooking' or request.action == 'cancelCooking' then
         if not ConventionalCooking then
             respond(src, request.requestId, { ok = false, error = 'cooking_unavailable' }); return
         end
-        respond(src, request.requestId, ConventionalCooking.start(src, person.id, data)); return
+        local data = request.data
+        if request.action == 'beginCooking' then
+            if not exactKeys(data, { businessId = true, recipeId = true, stationId = true, batches = true }) then
+                respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+            end
+            respond(src, request.requestId, ConventionalCooking.begin(src, person.id, data)); return
+        end
+        if not exactKeys(data, { token = true }) or type(data.token) ~= 'string'
+            or #data.token > 80 then
+            respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+        end
+        local result = request.action == 'finishCooking'
+            and ConventionalCooking.finish(src, person.id, data.token)
+            or ConventionalCooking.cancel(src, data.token)
+        respond(src, request.requestId, result); return
     end
     local jobActions = { listCookingJobs = 'list', startCookingJob = 'start',
         finishCookingJob = 'finish', cancelCookingJob = 'cancel',
@@ -632,4 +642,8 @@ end)
 exports('HasBusinessStaffPermission', function(src, businessId, permission)
     if not ready then return nil end
     return Staff.permission(src, businessId, permission)
+end)
+
+AddEventHandler('playerDropped', function()
+    if ConventionalCooking then ConventionalCooking.drop(source) end
 end)
