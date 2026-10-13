@@ -78,6 +78,13 @@ assert(ConventionalCooking.finish(1, 'owner', started.token).error == 'not_found
 local cancelled = ConventionalCooking.begin(1, 'owner', request)
 assert(cancelled.ok and ConventionalCooking.cancel(1, cancelled.token).ok)
 assert(ConventionalCooking.finish(1, 'owner', cancelled.token).error == 'not_found')
+local expired = ConventionalCooking.begin(1, 'owner', request)
+assert(expired.ok)
+now = now + 33001
+assert(ConventionalCooking.finish(1, 'owner', expired.token).error == 'cooking_expired')
+local again = ConventionalCooking.begin(1, 'owner', request)
+assert(again.ok)
+ConventionalCooking.drop(1)
 FoodBusiness.Modules.kitchen = false
 assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_disabled')
 print('conventional cooking inventory, timer, replay and cancellation tests passed')
