@@ -209,3 +209,7 @@ CreateThread(function()
         if not cooking then refreshCookingTargets() end
     end
 end)
+
+RegisterNetEvent('tsfb:refreshCookingTargets', function()
+    refreshCookingTargets()
+end)
