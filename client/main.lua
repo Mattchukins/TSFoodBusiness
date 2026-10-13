@@ -24,7 +24,7 @@ RegisterNUICallback('request', function(data, cb)
         or (data.action ~= 'listBusinesses' and data.action ~= 'listPresets' and data.action ~= 'listStationTypes'
             and data.action ~= 'listMyStaffBusinesses' and data.action ~= 'setMyStaffDuty' and data.action ~= 'listStaffShifts' and data.action ~= 'listStaffRoles' and data.action ~= 'listStaff'
             and data.action ~= 'setStaffDuty' and data.action ~= 'assignStaffMember' and data.action ~= 'updateStaffMember' and data.action ~= 'removeStaffMember'
-            and data.action ~= 'beginCooking' and data.action ~= 'finishCooking' and data.action ~= 'cancelCooking'
+            and data.action ~= 'listCookingTargets' and data.action ~= 'beginCooking' and data.action ~= 'finishCooking' and data.action ~= 'cancelCooking'
             and data.action ~= 'listCookingJobs' and data.action ~= 'startCookingJob'
             and data.action ~= 'finishCookingJob' and data.action ~= 'cancelCookingJob'
             and data.action ~= 'inspectCookingJob' and data.action ~= 'resumeCookingJob'
@@ -157,4 +157,44 @@ exports('RemoveCookingStation', function(zone)
         exports.ox_target:removeZone(zone)
     end
     return true
+end)
+
+-- Refresh local target zones from the server's owned, compatible recipes.
+local automaticZones = {}
+local function clearAutomaticZones()
+    for _, zone in ipairs(automaticZones) do
+        exports[GetCurrentResourceName()]:RemoveCookingStation(zone)
+    end
+    automaticZones = {}
+end
+local function refreshCookingTargets()
+    if GetResourceState('ox_target') ~= 'started' then return end
+    ask('listCookingTargets', {}, function(result)
+        if not result or not result.ok or type(result.targets) ~= 'table' then return end
+        clearAutomaticZones()
+        for _, target in ipairs(result.targets) do
+            if type(target.x) == 'number' and type(target.y) == 'number'
+                and type(target.z) == 'number'
+                and (target.routingBucket == nil or target.routingBucket == GetPlayerRoutingBucket(PlayerId())) then
+                local zone = exports[GetCurrentResourceName()]:RegisterCookingStation({
+                    businessId = target.businessId, recipeId = target.recipeId,
+                    stationId = target.stationId,
+                    coords = vector3(target.x, target.y, target.z),
+                    label = 'Prepare ' .. tostring(target.recipeName or 'food'),
+                })
+                if zone then automaticZones[#automaticZones + 1] = zone end
+            end
+        end
+    end)
+end
+RegisterCommand('foodbusiness_refresh_cooking', refreshCookingTargets, false)
+CreateThread(function()
+    Wait(5000)
+    refreshCookingTargets()
+end)
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource == 'ox_target' then
+        Wait(1000)
+        refreshCookingTargets()
+    end
 end)
