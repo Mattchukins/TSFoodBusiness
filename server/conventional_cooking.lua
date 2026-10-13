@@ -158,6 +158,20 @@ function ConventionalCooking.begin(src, actor, data)
         beginning[src] = nil
         return { ok = false, error = 'invalid_duration' }
     end
+    local inspection, inspectError = Inventory.inspectPlan(src, plan)
+    if not inspection then
+        beginning[src] = nil
+        return { ok = false, error = inspectError or 'inventory_unavailable' }
+    end
+    if inspection.available ~= true then
+        beginning[src] = nil
+        return { ok = false, error = 'insufficient_ingredients' }
+    end
+    local canCarry, capacityError = Inventory.standardOxCanCarry(src, plan.outputItem, plan.outputQuantity)
+    if canCarry ~= true then
+        beginning[src] = nil
+        return { ok = false, error = canCarry == nil and (capacityError or 'inventory_unavailable') or 'output_full' }
+    end
     local token = ('%d-%d-%d'):format(src, GetGameTimer(), math.random(100000, 999999))
     active[src] = { token = token, actor = actor, data = data, plan = plan,
         deadline = GetGameTimer() + plan.durationSeconds * 1000 }
