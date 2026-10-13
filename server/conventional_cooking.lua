@@ -1,6 +1,8 @@
 -- Conventional ox_inventory cooking transaction. No atomicity or crash durability
 -- is claimed. Caller must authorize actor, recipe, station and proximity.
 ConventionalCooking = {}
+local dependencies = {}
+function ConventionalCooking.configure(value) dependencies = value or {} end
 local busy = {}
 local function validItem(value)
     return type(value) == 'string' and #value >= 2 and #value <= 64
@@ -113,6 +115,9 @@ end
 function ConventionalCooking.start(src, actor, data)
     if not FoodBusiness or not FoodBusiness.ConventionalCookingEnabled then
         return { ok = false, error = 'cooking_disabled' }
+    end
+    if not FoodBusiness.ConventionalCookingDurableReady then
+        return { ok = false, error = 'durable_cooking_not_ready' }
     end
     if type(data) ~= 'table' or type(actor) ~= 'string'
         or not FoodBusiness.validJobId(data.businessId)
