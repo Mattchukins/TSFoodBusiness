@@ -19,6 +19,13 @@ exports = setmetatable({ ox_inventory = {
     end,
 })
 dofile('integrations/tsfb-ox-inventory/server.lua')
+local capability = callbacks.ProductionMutationCapabilities()
+assert(capability.upstreamCommit == '488aa6d754dfbf7d169f355ccbd647dc60c5ec3a')
+assert(capability.atomicProduction == false)
+assert(capability.durableEscrow == false)
+assert(capability.atomicOutput == false)
+assert(capability.restartReconciliation == false)
+assert(capability.liveVerified == false)
 assert(callbacks.ItemExists('flour') == true)
 assert(callbacks.ItemExists('unknown') == false)
 assert(callbacks.ItemExists('../flour') == false)
