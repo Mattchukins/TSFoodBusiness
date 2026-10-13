@@ -144,18 +144,23 @@ function ConventionalCooking.resolve(src, actor, data)
 end
 
 local active = {}
+local beginning = {}
 function ConventionalCooking.begin(src, actor, data)
-    if active[src] then return { ok = false, error = 'cooking_busy' } end
-    local resolved = ConventionalCooking.resolve(src, actor, data)
-    if not resolved.ok then return resolved end
+    if active[src] or beginning[src] or busy[src] then return { ok = false, error = 'cooking_busy' } end
+    beginning[src] = true
+    local ok, resolved = pcall(ConventionalCooking.resolve, src, actor, data)
+    if not ok then resolved = { ok = false, error = 'cooking_unavailable' } end
+    if not resolved.ok then beginning[src] = nil; return resolved end
     local plan = resolved.plan
     if type(plan.durationSeconds) ~= 'number' or plan.durationSeconds ~= math.floor(plan.durationSeconds)
         or plan.durationSeconds < 1 or plan.durationSeconds > 3600 then
+        beginning[src] = nil
         return { ok = false, error = 'invalid_duration' }
     end
     local token = ('%d-%d-%d'):format(src, GetGameTimer(), math.random(100000, 999999))
     active[src] = { token = token, actor = actor, data = data, plan = plan,
         deadline = GetGameTimer() + plan.durationSeconds * 1000 }
+    beginning[src] = nil
     return { ok = true, token = token, durationMs = plan.durationSeconds * 1000 }
 end
 function ConventionalCooking.finish(src, actor, token)
@@ -177,4 +182,7 @@ function ConventionalCooking.cancel(src, token)
     active[src] = nil
     return { ok = true }
 end
-function ConventionalCooking.drop(src) active[src] = nil end
+function ConventionalCooking.drop(src)
+    active[src] = nil
+    beginning[src] = nil
+end
