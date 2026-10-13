@@ -24,6 +24,7 @@ FoodBusiness.Inventory = { provider = 'ox_inventory', resource = 'ox_inventory',
 
 -- Explicit operator opt-in only after live adapter/recovery verification.
 -- The provider must satisfy docs/INVENTORY_RESERVATIONS.md atomically and durably.
+FoodBusiness.ConventionalCookingEnabled = false -- Keep off pending timers, replay protection and recovery testing.
 FoodBusiness.Inventory.mutationsVerified = false
 FoodBusiness.Inventory.inspectExport = 'InspectProductionReservation'
 FoodBusiness.Inventory.reserveExport = 'ReserveProduction'
