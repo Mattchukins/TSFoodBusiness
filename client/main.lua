@@ -122,10 +122,19 @@ exports('CookRecipe', function(businessId, recipeId, stationId, batches)
             lib.notify({ type = 'error', description = start and start.error or 'Cooking unavailable' })
             return
         end
-        local completed = lib.progressBar({
-            duration = start.durationMs, label = 'Preparing food',
-            canCancel = true, disable = { move = true, car = true, combat = true },
-        })
+        if type(start.token) ~= 'string' or type(start.durationMs) ~= 'number'
+            or start.durationMs < 1000 or start.durationMs > 3600000 then
+            cooking = false
+            lib.notify({ type = 'error', description = 'Invalid cooking response' })
+            return
+        end
+        local progressOk, completed = pcall(function()
+            return lib.progressBar({
+                duration = start.durationMs, label = 'Preparing food',
+                canCancel = true, disable = { move = true, car = true, combat = true },
+            })
+        end)
+        if not progressOk then completed = false end
         ask(completed and 'finishCooking' or 'cancelCooking', { token = start.token }, function(result)
             cooking = false
             if completed then
