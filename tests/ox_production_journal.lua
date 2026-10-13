@@ -32,8 +32,13 @@ MySQL.update = { await = function(_, values)
 end }
 MySQL.single.await = function() return stored end
 local payload = { jobId = id, ownerId = 'owner-42', planKey = 'plan-key', plan = {} }
+assert(journal.inspectReceipt(payload).state == 'absent')
 assert(journal.releaseAbsent(payload).state == 'released')
 assert(journal.releaseAbsent(payload).state == 'released')
 stored.state = 'reserved'
+assert(select(2, journal.inspectReceipt(payload)) == 'reservation_unresolved')
 assert(select(2, journal.releaseAbsent(payload)) == 'reservation_conflict')
+stored.state = 'released'
+assert(journal.inspectReceipt(payload).state == 'released')
+assert(select(2, journal.inspectReceipt({ jobId = id, ownerId = 'different', planKey = 'plan-key' })) == 'reservation_conflict')
 print('ox production journal diagnostic validation and release tombstones passed (mocked)')
