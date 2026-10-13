@@ -62,7 +62,13 @@ RegisterNUICallback('request', function(data, cb)
     pendingCount = pendingCount + 1
     TriggerServerEvent('tsfb:request', { requestId = id, action = data.action, data = data.payload })
     SetTimeout(10000, function()
-        if pending[id] then pending[id]({ ok = false, error = 'timeout' }); pending[id] = nil; refreshRequests[id] = nil; pendingCount = pendingCount - 1 end
+        local callback = pending[id]
+        if callback then
+            pending[id] = nil
+            refreshRequests[id] = nil
+            pendingCount = pendingCount - 1
+            callback({ ok = false, error = 'timeout' })
+        end
     end)
 end)
 
@@ -105,10 +111,11 @@ local function ask(action, data, callback)
     pendingCount = pendingCount + 1
     TriggerServerEvent('tsfb:request', { requestId = id, action = action, data = data })
     SetTimeout(10000, function()
-        if pending[id] then
-            pending[id]({ ok = false, error = 'timeout' })
+        local callback = pending[id]
+        if callback then
             pending[id] = nil
             pendingCount = pendingCount - 1
+            callback({ ok = false, error = 'timeout' })
         end
     end)
 end
