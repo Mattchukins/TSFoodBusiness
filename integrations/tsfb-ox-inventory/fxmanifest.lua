@@ -8,5 +8,5 @@ description 'Fail-closed ox_inventory integration for TSFoodBusiness'
 version '0.1.0'
 
 dependencies { 'ox_inventory', 'oxmysql' }
-server_scripts { '@oxmysql/lib/MySQL.lua', 'server.lua' }
-files { 'journal.lua' }
+server_scripts { '@oxmysql/lib/MySQL.lua', 'server.lua', 'stock_provider.lua' }
+files { 'journal.lua', 'stock_engine.lua' }
