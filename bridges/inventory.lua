@@ -6,8 +6,17 @@ end
 local function integer(value, maximum)
     return type(value) == 'number' and value == value and value >= 0 and value <= maximum and value == math.floor(value)
 end
+local function standardOx()
+    return type(FoodBusiness.Inventory) == 'table'
+        and FoodBusiness.Inventory.provider == 'ox_inventory'
+        and GetResourceState('ox_inventory') == 'started'
+end
 local function provider()
     local config = FoodBusiness.Inventory
+    if standardOx() then return {
+        resource = 'ox_inventory', itemExistsExport = 'Items', countExport = 'GetItemCount',
+        standardOx = true,
+    } end
     if type(config) ~= 'table' or config.provider ~= 'custom' or type(config.resource) ~= 'string'
         or not config.resource:match('^[%w_%-]+$') or GetResourceState(config.resource) ~= 'started'
         or type(config.itemExistsExport) ~= 'string' or not config.itemExistsExport:match('^[%w_]+$')
@@ -16,7 +25,7 @@ local function provider()
 end
 local function mutationProvider()
     local config = provider()
-    if not config or config.mutationsVerified ~= true then return nil end
+    if not config or config.standardOx or config.mutationsVerified ~= true then return nil end
     for _, key in ipairs({ 'inspectExport', 'reserveExport', 'commitExport', 'releaseExport' }) do
         if type(config[key]) ~= 'string' or not config[key]:match('^[%w_]+$') then return nil end
     end
@@ -47,7 +56,9 @@ function Inventory.itemExists(item)
         local proxy = exports[config.resource]
         return proxy[config.itemExistsExport](proxy, item)
     end)
-    if not ok or type(exists) ~= 'boolean' then return nil, 'inventory_error' end
+    if not ok then return nil, 'inventory_error' end
+    if config.standardOx then return type(exists) == 'table' end
+    if type(exists) ~= 'boolean' then return nil, 'inventory_error' end
     return exists
 end
 function Inventory.count(src, item)
