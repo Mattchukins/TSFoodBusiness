@@ -29,11 +29,15 @@ BEGIN
   ORDER BY item;
  DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_done = TRUE;
  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
- IF p_job IS NULL OR p_job NOT REGEXP '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}
+ IF p_job IS NULL OR p_job NOT REGEXP '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    OR p_owner IS NULL OR CHAR_LENGTH(p_owner) NOT BETWEEN 2 AND 80
+    OR p_key IS NULL OR CHAR_LENGTH(p_key) NOT BETWEEN 1 AND 1600
+    OR p_plan IS NULL OR JSON_VALID(p_plan) <> 1 THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='invalid_reservation';
  END IF;
  SET v_expected = JSON_LENGTH(p_plan, '$.ingredients');
- IF JSON_TYPE(JSON_EXTRACT(p_plan, '
+ IF JSON_TYPE(JSON_EXTRACT(p_plan, '$')) <> 'OBJECT' OR
+    v_expected IS NULL OR v_expected NOT BETWEEN 1 AND 16 OR
     JSON_TYPE(JSON_EXTRACT(p_plan, '$.ingredients')) <> 'ARRAY' OR
     JSON_TYPE(JSON_EXTRACT(p_plan, '$.outputItem')) <> 'STRING' OR
     JSON_TYPE(JSON_EXTRACT(p_plan, '$.outputQuantity')) <> 'INTEGER' THEN
