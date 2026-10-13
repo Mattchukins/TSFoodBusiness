@@ -21,6 +21,11 @@ sql "CALL tsfb_stock_reserve('$job','$owner','$key','$plan');" >/dev/null
 [[ "$(scalar "SELECT quantity FROM tsfb_ox_escrow WHERE job_id='$job' AND item='flour'")" == 3 ]]
 sql "CALL tsfb_stock_reserve('$job','$owner','$key','$plan');" >/dev/null
 [[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='flour'")" == 7 ]]
+# Replaying the same job/key with a different plan must not silently succeed.
+if sql "CALL tsfb_stock_reserve('$job','$owner','$key','{\"outputItem\":\"bread\",\"outputQuantity\":3,\"ingredients\":[{\"item\":\"flour\",\"quantity\":3}]}');" >/dev/null 2>&1; then
+  echo 'ERROR: changed plan accepted on replay' >&2; exit 1
+fi
+[[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='flour'")" == 7 ]]
 sql "CALL tsfb_stock_commit('$job','$owner','$key');" >/dev/null
 sql "CALL tsfb_stock_commit('$job','$owner','$key');" >/dev/null
 [[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='bread'")" == 2 ]]
@@ -55,4 +60,8 @@ if sql "CALL tsfb_stock_reserve('$job4','$owner','$key','{\"outputItem\":\"bread
 fi
 [[ "$(scalar "SELECT COUNT(*) FROM tsfb_ox_production_receipts WHERE job_id='$job4'")" == 0 ]]
 [[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='flour'")" == 7 ]]
+# Missing receipt must never count as a successful release.
+if sql "CALL tsfb_stock_release('99999999-1234-1234-1234-123456789abc','$owner','$key');" >/dev/null 2>&1; then
+  echo 'ERROR: missing release receipt accepted' >&2; exit 1
+fi
 echo 'MySQL stock reserve/commit/release/replay/rollback integration tests passed'
