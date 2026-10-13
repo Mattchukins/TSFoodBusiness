@@ -120,3 +120,41 @@ exports('CookRecipe', function(businessId, recipeId, stationId, batches)
     end)
     return true
 end)
+
+-- Optional ox_target integration for server-configured station locations.
+-- The server still validates ownership, recipe, station and distance.
+local targetZones = {}
+exports('RegisterCookingStation', function(config)
+    if type(config) ~= 'table' or type(config.businessId) ~= 'string'
+        or type(config.recipeId) ~= 'string' or type(config.stationId) ~= 'string'
+        or type(config.coords) ~= 'vector3' or GetResourceState('ox_target') ~= 'started' then
+        return false
+    end
+    local batches = config.batches or 1
+    if type(batches) ~= 'number' or batches ~= math.floor(batches)
+        or batches < 1 or batches > 100 then return false end
+    local zone = exports.ox_target:addSphereZone({
+        coords = config.coords, radius = 1.5, debug = false,
+        options = {{
+            name = 'tsfb_cook_' .. config.stationId .. '_' .. config.recipeId,
+            icon = 'fa-solid fa-utensils',
+            label = config.label or 'Prepare food',
+            distance = 2.0,
+            onSelect = function()
+                exports[GetCurrentResourceName()]:CookRecipe(
+                    config.businessId, config.recipeId, config.stationId, batches)
+            end,
+        }},
+    })
+    if not zone then return false end
+    targetZones[zone] = true
+    return zone
+end)
+exports('RemoveCookingStation', function(zone)
+    if not targetZones[zone] then return false end
+    targetZones[zone] = nil
+    if GetResourceState('ox_target') == 'started' then
+        exports.ox_target:removeZone(zone)
+    end
+    return true
+end)
