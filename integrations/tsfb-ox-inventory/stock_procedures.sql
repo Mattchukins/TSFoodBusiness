@@ -115,7 +115,7 @@ BEGIN
   END IF;
   INSERT INTO tsfb_ox_stock(owner_id,item,quantity)
    VALUES(p_owner,v_item,v_qty)
-   ON DUPLICATE KEY UPDATE quantity=quantity+VALUES(quantity);
+   ON DUPLICATE KEY UPDATE quantity=tsfb_ox_stock.quantity+VALUES(quantity);
   DELETE FROM tsfb_ox_escrow WHERE job_id=p_job;
   UPDATE tsfb_ox_production_receipts SET state='committed',revision=revision+1
    WHERE job_id=p_job;
@@ -147,7 +147,7 @@ BEGIN
  IF v_state='reserved' THEN
   INSERT INTO tsfb_ox_stock(owner_id,item,quantity)
    SELECT p_owner,item,quantity FROM tsfb_ox_escrow WHERE job_id=p_job
-   ON DUPLICATE KEY UPDATE quantity=quantity+VALUES(quantity);
+   ON DUPLICATE KEY UPDATE quantity=tsfb_ox_stock.quantity+VALUES(quantity);
   DELETE FROM tsfb_ox_escrow WHERE job_id=p_job;
   UPDATE tsfb_ox_production_receipts SET state='released',revision=revision+1
    WHERE job_id=p_job;
