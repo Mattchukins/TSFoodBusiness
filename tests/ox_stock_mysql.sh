@@ -39,4 +39,20 @@ if sql "CALL tsfb_stock_reserve('$job3','$owner','$key','{\"outputItem\":\"bread
 fi
 [[ "$(scalar "SELECT COUNT(*) FROM tsfb_ox_production_receipts WHERE job_id='$job3'")" == 0 ]]
 [[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='flour'")" == 7 ]]
+# A mismatched owner must not gain access to a committed receipt.
+if sql "CALL tsfb_stock_commit('$job','intruder','$key');" >/dev/null 2>&1; then
+  echo 'ERROR: owner mismatch accepted' >&2; exit 1
+fi
+# A mismatched plan key must not release someone else's escrow.
+if sql "CALL tsfb_stock_release('$job2','$owner','different-plan');" >/dev/null 2>&1; then
+  echo 'ERROR: plan mismatch accepted' >&2; exit 1
+fi
+[[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='bread'")" == 2 ]]
+# Duplicate ingredient rows must roll back atomically.
+job4='abcdef34-1234-1234-1234-123456789abc'
+if sql "CALL tsfb_stock_reserve('$job4','$owner','$key','{\"outputItem\":\"bread\",\"outputQuantity\":2,\"ingredients\":[{\"item\":\"flour\",\"quantity\":1},{\"item\":\"flour\",\"quantity\":1}]}');" >/dev/null 2>&1; then
+  echo 'ERROR: duplicate ingredient accepted' >&2; exit 1
+fi
+[[ "$(scalar "SELECT COUNT(*) FROM tsfb_ox_production_receipts WHERE job_id='$job4'")" == 0 ]]
+[[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='flour'")" == 7 ]]
 echo 'MySQL stock reserve/commit/release/replay/rollback integration tests passed'
