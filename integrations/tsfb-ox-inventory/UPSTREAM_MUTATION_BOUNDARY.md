@@ -1,6 +1,6 @@
 # Standard ox_inventory mutation boundary — implementation decision
 
-Source baseline: upstream `overextended/ox_inventory`, `modules/inventory/server.lua` (reviewed 13 October 2026). Revalidate against a pinned upstream commit before deployment.
+Source baseline: upstream `overextended/ox_inventory` commit [`488aa6d754dfbf7d169f355ccbd647dc60c5ec3a`](https://github.com/overextended/ox_inventory/tree/488aa6d754dfbf7d169f355ccbd647dc60c5ec3a), `modules/inventory/server.lua` (reviewed 13 October 2026). Pin and revalidate this exact revision before integration; do not assume compatibility with forks.
 
 ## Verified source behaviour
 
