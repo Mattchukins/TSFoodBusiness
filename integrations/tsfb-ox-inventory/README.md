@@ -59,3 +59,24 @@ schema is not a substitute for atomic ox_inventory mutations.
 
 Do not enable cooking based on this feature. The release export is
 intentionally not an escrow recovery mechanism.
+
+
+## Receipt inspection (implemented, limited)
+
+`InspectProductionReservation` reads the durable journal and validates the
+job ID, owner ID and immutable plan key. It returns `absent` when no row
+exists and `released` for a matching release tombstone. Rows marked
+`intent`, `reserved` or `committed` fail closed as unresolved because
+this integration has not actually implemented ox_inventory mutations. A
+SQL state is never evidence that an ox_inventory transfer happened.
+
+## Live verification gate
+
+Before allowing `mutationsVerified = true`, a server operator must provide
+a controlled FiveM staging environment with ox_inventory and oxmysql,
+confirm the exact ox_inventory version/fork and persistence behavior, and
+exercise process termination at every write boundary. Test all three
+frameworks (ESX, QBCore and QBox) independently, including disconnects,
+capacity failures, metadata preservation, restart recovery, simultaneous
+claims and duplicate requests. Record observed database and inventory
+balances before and after each test. No live verification has been performed.
