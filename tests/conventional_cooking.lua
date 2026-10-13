@@ -124,6 +124,35 @@ ConventionalCooking.configure({
 })
 assert(ConventionalCooking.begin(1, 'owner', request).ok)
 ConventionalCooking.drop(1)
+-- Cancel must never consume ingredients or grant output.
+stock.flour, stock.water, stock.bread = 3, 2, 0
+local cancelledStock = ConventionalCooking.begin(1, 'owner', request)
+assert(cancelledStock.ok)
+assert(ConventionalCooking.cancel(1, cancelledStock.token).ok)
+assert(stock.flour == 3 and stock.water == 2 and stock.bread == 0)
+-- Capacity failure at start must not leave a cooking lock behind.
+local originalCapacity = Inventory.standardOxCanCarry
+Inventory.standardOxCanCarry = function() return false end
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'output_full')
+Inventory.standardOxCanCarry = function() error('inventory disconnected') end
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'inventory_unavailable')
+Inventory.standardOxCanCarry = originalCapacity
+-- Revoked ownership after progress must reject completion without mutations.
+local revokedSession = ConventionalCooking.begin(1, 'owner', request)
+assert(revokedSession.ok)
+now = now + 2000
+ConventionalCooking.configure({
+ owner = function() return false end,
+ near = function() return true end,
+ plan = function() return plan end,
+})
+assert(ConventionalCooking.finish(1, 'owner', revokedSession.token).error == 'forbidden')
+assert(stock.flour == 3 and stock.water == 2 and stock.bread == 0)
+ConventionalCooking.configure({
+ owner = function() return true end,
+ near = function() return true end,
+ plan = function() return plan end,
+})
 FoodBusiness.Modules.kitchen = false
 assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_disabled')
 print('conventional cooking inventory, timer, replay and cancellation tests passed')
