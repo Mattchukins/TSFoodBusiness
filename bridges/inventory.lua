@@ -140,3 +140,35 @@ function Inventory.inspectReservation(job) return productionOperation('inspect',
 function Inventory.reserve(job) return productionOperation('reserve', job) end
 function Inventory.commit(job) return productionOperation('commit', job) end
 function Inventory.release(job) return productionOperation('release', job) end
+
+-- Conventional upstream ox_inventory operations. These are individually checked
+-- exports, NOT an atomic reservation or durable cooking transaction.
+local function oxMutation(src, item, quantity, operation)
+    if not standardOx() then return nil, 'standard_ox_inventory_unavailable' end
+    if not integer(src, 2147483647) or src == 0 or not itemName(item)
+        or not integer(quantity, 100000) or quantity == 0 then return nil, 'invalid_arguments' end
+    local ok, result, reason = pcall(function()
+        local proxy = exports.ox_inventory
+        return proxy[operation](proxy, src, item, quantity)
+    end)
+    if not ok then return nil, 'inventory_outcome_unknown' end
+    if result == true then return true end
+    if result == false then return false, type(reason) == 'string' and reason or 'inventory_rejected' end
+    return nil, 'inventory_outcome_unknown'
+end
+function Inventory.standardOxRemove(src, item, quantity)
+    return oxMutation(src, item, quantity, 'RemoveItem')
+end
+function Inventory.standardOxAdd(src, item, quantity)
+    return oxMutation(src, item, quantity, 'AddItem')
+end
+function Inventory.standardOxCanCarry(src, item, quantity)
+    if not standardOx() then return nil, 'standard_ox_inventory_unavailable' end
+    if not integer(src, 2147483647) or src == 0 or not itemName(item)
+        or not integer(quantity, 100000) or quantity == 0 then return nil, 'invalid_arguments' end
+    local ok, result = pcall(function()
+        return exports.ox_inventory:CanCarryItem(src, item, quantity)
+    end)
+    if not ok or type(result) ~= 'boolean' then return nil, 'inventory_outcome_unknown' end
+    return result
+end
