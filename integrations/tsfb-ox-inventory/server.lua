@@ -39,7 +39,11 @@ end)
 local function unsupported()
     error('tsfb_ox_inventory_atomic_mutations_not_implemented')
 end
-exports('InspectProductionReservation', unsupported)
+exports('InspectProductionReservation', function(payload)
+    local receipt, reason = Journal.inspectReceipt(payload)
+    if not receipt then error(reason or 'journal_unavailable') end
+    return receipt
+end)
 exports('ReserveProduction', unsupported)
 exports('CommitProduction', unsupported)
 exports('ReleaseProduction', function(payload)
