@@ -215,7 +215,13 @@ refreshCookingTargets = function()
     local epoch = cookingRefreshEpoch
     ask('listCookingTargets', {}, function(result)
         refreshingCookingTargets = false
-        if epoch ~= cookingRefreshEpoch then return end
+        if epoch ~= cookingRefreshEpoch then
+            if cookingRefreshQueued then
+                cookingRefreshQueued = false
+                SetTimeout(250, refreshCookingTargets)
+            end
+            return
+        end
         if cookingRefreshQueued then
             cookingRefreshQueued = false
             SetTimeout(250, refreshCookingTargets)
@@ -287,8 +293,8 @@ end)
 AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= 'ox_target' then return end
     cookingRefreshEpoch = cookingRefreshEpoch + 1
+    cookingRefreshQueued = true
     automaticZones = {}
     automaticTargetSignature = nil
     targetZones = {}
-    cookingRefreshQueued = false
 end)
