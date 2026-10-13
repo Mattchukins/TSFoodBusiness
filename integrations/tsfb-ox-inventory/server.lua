@@ -10,7 +10,8 @@ local function ready()
 end
 
 exports('ItemExists', function(item)
-    if not ready() or not validItem(item) then return false end
+    if not validItem(item) then return false end
+    if not ready() then return nil end
     local ok, result = pcall(function()
         return exports.ox_inventory:Items(item)
     end)
