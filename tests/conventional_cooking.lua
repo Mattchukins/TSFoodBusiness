@@ -54,13 +54,12 @@ local denied = ConventionalCooking.produce(1, plan, function()
 end)
 assert(denied.error == 'forbidden')
 assert(stock.flour == 3 and stock.water == 2)
--- Public request path must fail closed until the durable timer/replay
--- implementation is actually available, even with feature flag enabled.
-FoodBusiness = {
- ConventionalCookingEnabled = true,
- ConventionalCookingDurableReady = false,
- validJobId = function(value) return type(value) == 'string' and #value == 36 end,
-}
+-- Lightweight FiveM timer: reject early finish and replay.
+local now = 1000
+GetGameTimer = function() return now end
+FoodBusiness = { Modules = { kitchen = true },
+ validJobId = function(value) return type(value) == 'string' and #value == 36 end }
+plan.durationSeconds = 2
 ConventionalCooking.configure({
  owner = function() return true end,
  near = function() return true end,
@@ -68,6 +67,17 @@ ConventionalCooking.configure({
 })
 local request = { businessId = string.rep('a', 36), recipeId = string.rep('b', 36),
  stationId = string.rep('c', 36), batches = 1 }
-assert(ConventionalCooking.start(1, 'owner', request).error == 'durable_cooking_not_ready')
-assert(stock.flour == 3 and stock.water == 2)
-print('conventional cooking compensation, reauthorization, uncertain outcome, locking and safe feature gate tests passed')
+stock.flour, stock.water = 3, 2
+local started = ConventionalCooking.begin(1, 'owner', request)
+assert(started.ok and started.durationMs == 2000)
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_busy')
+assert(ConventionalCooking.finish(1, 'owner', started.token).error == 'cooking_not_ready')
+now = 3000
+assert(ConventionalCooking.finish(1, 'owner', started.token).ok)
+assert(ConventionalCooking.finish(1, 'owner', started.token).error == 'not_found')
+local cancelled = ConventionalCooking.begin(1, 'owner', request)
+assert(cancelled.ok and ConventionalCooking.cancel(1, cancelled.token).ok)
+assert(ConventionalCooking.finish(1, 'owner', cancelled.token).error == 'not_found')
+FoodBusiness.Modules.kitchen = false
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_disabled')
+print('conventional cooking inventory, timer, replay and cancellation tests passed')
