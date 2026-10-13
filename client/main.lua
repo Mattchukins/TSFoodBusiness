@@ -200,11 +200,13 @@ local automaticZones = {}
 local refreshingCookingTargets = false
 local cookingRefreshQueued = false
 local cookingRefreshEpoch = 0
+local automaticTargetSignature = nil
 local function clearAutomaticZones()
     for _, zone in ipairs(automaticZones) do
         exports[GetCurrentResourceName()]:RemoveCookingStation(zone)
     end
     automaticZones = {}
+    automaticTargetSignature = nil
 end
 refreshCookingTargets = function()
     if refreshingCookingTargets then cookingRefreshQueued = true; return end
@@ -219,7 +221,18 @@ refreshCookingTargets = function()
             SetTimeout(250, refreshCookingTargets)
         end
         if not result or not result.ok or type(result.targets) ~= 'table' then return end
+        local signatureParts = {}
+        for _, target in ipairs(result.targets) do
+            signatureParts[#signatureParts + 1] = table.concat({
+                tostring(target.businessId), tostring(target.stationId),
+                tostring(target.recipeId), tostring(target.recipeName),
+                tostring(target.x), tostring(target.y), tostring(target.z),
+            }, ':')
+        end
+        local signature = table.concat(signatureParts, '|')
+        if signature == automaticTargetSignature then return end
         clearAutomaticZones()
+        automaticTargetSignature = signature
         for _, target in ipairs(result.targets) do
             if type(target.x) == 'number' and type(target.y) == 'number'
                 and type(target.z) == 'number'
@@ -275,6 +288,7 @@ AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= 'ox_target' then return end
     cookingRefreshEpoch = cookingRefreshEpoch + 1
     automaticZones = {}
+    automaticTargetSignature = nil
     targetZones = {}
     cookingRefreshQueued = false
 end)
