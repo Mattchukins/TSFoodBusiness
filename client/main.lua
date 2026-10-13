@@ -76,7 +76,7 @@ RegisterNetEvent('tsfb:response', function(message)
         refreshRequests[message.requestId] = nil
         cb(message.result)
         if shouldRefresh and type(message.result) == 'table' and message.result.ok == true
-            and refreshCookingTargets then refreshCookingTargets() end
+            and refreshCookingTargets then SetTimeout(250, refreshCookingTargets) end
     end
 end)
 
