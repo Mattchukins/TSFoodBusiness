@@ -112,7 +112,7 @@ end
 
 -- Resolve the recipe and station exclusively on the server. This entrypoint
 -- remains opt-in until duration, replay and recovery are integrated.
-function ConventionalCooking.start(src, actor, data)
+function ConventionalCooking.resolve(src, actor, data)
     if not FoodBusiness or not FoodBusiness.Modules.kitchen then
         return { ok = false, error = 'cooking_disabled' }
     end
@@ -137,11 +137,44 @@ function ConventionalCooking.start(src, actor, data)
         if not dependencies.near(src, actor, data.businessId, data.stationId, plan) then
             return { ok = false, error = 'station_not_near' }
         end
-        return ConventionalCooking.produce(src, plan, function()
-            return dependencies.owner(src, actor, data.businessId)
-                and dependencies.near(src, actor, data.businessId, data.stationId, plan)
-        end)
+        return { ok = true, plan = plan }
     end)
     if not ok then return { ok = false, error = 'cooking_unavailable' } end
     return result
 end
+
+local active = {}
+function ConventionalCooking.begin(src, actor, data)
+    if active[src] then return { ok = false, error = 'cooking_busy' } end
+    local resolved = ConventionalCooking.resolve(src, actor, data)
+    if not resolved.ok then return resolved end
+    local plan = resolved.plan
+    if type(plan.durationSeconds) ~= 'number' or plan.durationSeconds ~= math.floor(plan.durationSeconds)
+        or plan.durationSeconds < 1 or plan.durationSeconds > 3600 then
+        return { ok = false, error = 'invalid_duration' }
+    end
+    local token = ('%d-%d-%d'):format(src, GetGameTimer(), math.random(100000, 999999))
+    active[src] = { token = token, actor = actor, data = data, plan = plan,
+        deadline = GetGameTimer() + plan.durationSeconds * 1000 }
+    return { ok = true, token = token, durationMs = plan.durationSeconds * 1000 }
+end
+function ConventionalCooking.finish(src, actor, token)
+    local session = active[src]
+    if not session or session.token ~= token or session.actor ~= actor then
+        return { ok = false, error = 'not_found' }
+    end
+    if GetGameTimer() < session.deadline then return { ok = false, error = 'cooking_not_ready' } end
+    active[src] = nil
+    return ConventionalCooking.produce(src, session.plan, function()
+        return dependencies.owner(src, actor, session.data.businessId) == true
+            and dependencies.near(src, actor, session.data.businessId, session.data.stationId, session.plan) == true
+    end)
+end
+function ConventionalCooking.cancel(src, token)
+    if not active[src] or active[src].token ~= token then
+        return { ok = false, error = 'not_found' }
+    end
+    active[src] = nil
+    return { ok = true }
+end
+function ConventionalCooking.drop(src) active[src] = nil end
