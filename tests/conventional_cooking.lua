@@ -54,4 +54,20 @@ local denied = ConventionalCooking.produce(1, plan, function()
 end)
 assert(denied.error == 'forbidden')
 assert(stock.flour == 3 and stock.water == 2)
-print('conventional cooking compensation, reauthorization, uncertain outcome and locking tests passed')
+-- Public request path must fail closed until the durable timer/replay
+-- implementation is actually available, even with feature flag enabled.
+FoodBusiness = {
+ ConventionalCookingEnabled = true,
+ ConventionalCookingDurableReady = false,
+ validJobId = function(value) return type(value) == 'string' and #value == 36 end,
+}
+ConventionalCooking.configure({
+ owner = function() return true end,
+ near = function() return true end,
+ plan = function() return plan end,
+})
+local request = { businessId = string.rep('a', 36), recipeId = string.rep('b', 36),
+ stationId = string.rep('c', 36), batches = 1 }
+assert(ConventionalCooking.start(1, 'owner', request).error == 'durable_cooking_not_ready')
+assert(stock.flour == 3 and stock.water == 2)
+print('conventional cooking compensation, reauthorization, uncertain outcome, locking and safe feature gate tests passed')
