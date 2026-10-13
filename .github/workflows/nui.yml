@@ -26,6 +26,7 @@ jobs:
       - run: lua5.4 tests/inventory_stateful_contract.lua
       - run: lua5.4 tests/ox_inventory_adapter.lua
       - run: lua5.4 tests/ox_production_journal.lua
+      - run: lua5.4 tests/ox_stock_engine.lua
       - run: python3 tests/sql_contract.py
   nui:
     runs-on: ubuntu-latest
