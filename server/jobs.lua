@@ -140,6 +140,11 @@ function CookingJobs.list(src, actor, businessId)
     return { ok = true, jobs = jobs, cookingEnabled = enabled() }
 end
 function CookingJobs.act(src, actor, data, action)
+    -- Reject unsupported actions before reading provider receipts or reconciling state.
+    if action ~= 'inspect' and action ~= 'resume' and action ~= 'finish' and action ~= 'cancel' then
+        return result(nil, 'invalid_action')
+    end
+    if type(data) ~= 'table' then return result(nil, 'invalid_payload') end
     if not FoodBusiness.validJobId(data.businessId) or not FoodBusiness.validJobId(data.jobId) then return result(nil, 'invalid_payload') end
     return locked('job:' .. data.jobId, function()
         if not owned(src, actor, data.businessId) then return result(nil, 'forbidden') end
