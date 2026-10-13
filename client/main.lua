@@ -235,6 +235,7 @@ refreshCookingTargets = function()
                 tostring(target.x), tostring(target.y), tostring(target.z),
             }, ':')
         end
+        table.sort(signatureParts)
         local signature = table.concat(signatureParts, '|')
         if signature == automaticTargetSignature then return end
         clearAutomaticZones()
