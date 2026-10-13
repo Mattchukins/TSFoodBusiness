@@ -96,8 +96,11 @@ end, false)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == GetCurrentResourceName() then
-        for id, cb in pairs(pending) do cb({ ok = false, error = 'resource_stopped' }); pending[id] = nil end
+        local callbacks = pending
+        pending = {}
+        refreshRequests = {}
         pendingCount = 0
+        for _, cb in pairs(callbacks) do cb({ ok = false, error = 'resource_stopped' }) end
         SetNuiFocus(false, false)
     end
 end)
