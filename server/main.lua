@@ -120,6 +120,30 @@ local function handleRequest(src, request)
         end
         respond(src, request.requestId, { ok = true, stationTypes = FoodBusiness.listStationTypes() }); return
     end
+    if request.action == 'listCookingTargets' then
+        if next(request.data) ~= nil then
+            respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
+        end
+        if not FoodBusiness.Modules.kitchen or not FoodBusiness.Modules.stations then
+            respond(src, request.requestId, { ok = true, targets = {} }); return
+        end
+        local ok, rows = pcall(function()
+            return MySQL.query.await([[
+                SELECT s.id AS stationId, s.business_id AS businessId,
+                    r.id AS recipeId, r.name AS recipeName,
+                    s.x, s.y, s.z, s.routing_bucket AS routingBucket
+                FROM tsfb_stations s
+                JOIN tsfb_businesses b ON b.id = s.business_id
+                JOIN tsfb_recipes r ON r.business_id = b.id
+                JOIN tsfb_production_profiles p ON p.recipe_id = r.id
+                    AND p.station_type = s.type
+                WHERE b.owner_id = ?
+                ORDER BY b.id, s.id, r.name LIMIT 200
+            ]], { person.id })
+        end)
+        respond(src, request.requestId, ok and { ok = true, targets = rows }
+            or { ok = false, error = 'database_error' }); return
+    end
     if request.action == 'listBusinesses' then
         if next(request.data) ~= nil then
             respond(src, request.requestId, { ok = false, error = 'invalid_payload' }); return
