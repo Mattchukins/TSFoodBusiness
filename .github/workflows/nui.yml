@@ -28,6 +28,26 @@ jobs:
       - run: lua5.4 tests/ox_production_journal.lua
       - run: lua5.4 tests/ox_stock_engine.lua
       - run: python3 tests/sql_contract.py
+  mysql-stock:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: test-root-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ptest-root-password"
+          --health-interval=10s --health-timeout=5s --health-retries=15
+    env:
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_USER: root
+      MYSQL_PASSWORD: test-root-password
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y mysql-client
+      - run: bash tests/ox_stock_mysql.sh
   nui:
     runs-on: ubuntu-latest
     defaults:
