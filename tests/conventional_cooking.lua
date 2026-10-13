@@ -153,6 +153,23 @@ ConventionalCooking.configure({
  near = function() return true end,
  plan = function() return plan end,
 })
+-- Authorization can change while inventory preflight yields.
+local originalPreflight = Inventory.inspectPlan
+local permitted = true
+ConventionalCooking.configure({
+ owner = function() return permitted end,
+ near = function() return true end,
+ plan = function() return plan end,
+})
+Inventory.inspectPlan = function(...)
+ permitted = false
+ return originalPreflight(...)
+end
+assert(ConventionalCooking.begin(1, 'owner', request).error == 'forbidden')
+Inventory.inspectPlan = originalPreflight
+permitted = true
+assert(ConventionalCooking.begin(1, 'owner', request).ok)
+ConventionalCooking.drop(1)
 FoodBusiness.Modules.kitchen = false
 assert(ConventionalCooking.begin(1, 'owner', request).error == 'cooking_disabled')
 print('conventional cooking inventory, timer, replay and cancellation tests passed')
