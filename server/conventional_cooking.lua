@@ -145,9 +145,10 @@ end
 
 local active = {}
 local beginning = {}
+local finishing = {}
 function ConventionalCooking.begin(src, actor, data)
     if active[src] and GetGameTimer() > active[src].deadline + 30000 then active[src] = nil end
-    if active[src] or beginning[src] or busy[src] then return { ok = false, error = 'cooking_busy' } end
+    if active[src] or beginning[src] or finishing[src] or busy[src] then return { ok = false, error = 'cooking_busy' } end
     beginning[src] = true
     local ok, resolved = pcall(ConventionalCooking.resolve, src, actor, data)
     if not ok then resolved = { ok = false, error = 'cooking_unavailable' } end
@@ -197,10 +198,14 @@ function ConventionalCooking.finish(src, actor, token)
         return { ok = false, error = 'cooking_expired' }
     end
     active[src] = nil
-    return ConventionalCooking.produce(src, session.plan, function()
+    finishing[src] = true
+    local ok, result = pcall(ConventionalCooking.produce, src, session.plan, function()
         return dependencies.owner(src, actor, session.data.businessId) == true
             and dependencies.near(src, actor, session.data.businessId, session.data.stationId, session.plan) == true
     end)
+    finishing[src] = nil
+    if not ok then return { ok = false, error = 'manual_inventory_recovery_required' } end
+    return result
 end
 function ConventionalCooking.cancel(src, token)
     if not active[src] or active[src].token ~= token then
