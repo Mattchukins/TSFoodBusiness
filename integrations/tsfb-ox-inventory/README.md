@@ -87,12 +87,16 @@ balances before and after each test. No live verification has been performed.
 `stock_schema.sql` defines stock and escrow tables; `stock_procedures.sql`
 defines three MySQL 8+ procedures: `tsfb_stock_reserve`,
 `tsfb_stock_commit`, and `tsfb_stock_release`. These run receipt, stock,
-escrow and audit mutations inside a single InnoDB transaction. They are
-**not connected to the Lua provider exports**, and **not integrated with
-ox_inventory item transfers**. SQL-owned stock is not a player inventory.
+escrow and audit mutations inside a single InnoDB transaction. They are exposed through separate **experimental SQL-only Lua exports**, but
+are **not integrated with ox_inventory item transfers**. SQL-owned stock is not a player inventory.
 
 **Do not execute these procedures on production data yet.** They require
 database-level integration tests, verified JSON input constraints, stock
 capacity/overflow checks, consistent locking against every stock writer,
-and versioned migrations. The existing `stock_engine.lua` deliberately
-refuses mutations until this executor is fully validated and wired.
+and versioned migrations. The `stock_engine.lua` dispatcher now calls checked stored procedures through
+`stock_provider.lua` when invoked via `SqlStockReserveExperimental`,
+`SqlStockCommitExperimental` or `SqlStockReleaseExperimental` exports.
+These exports are test-only; the regular `ReserveProduction`,
+`CommitProduction` and `ReleaseProduction` ox_inventory contract remains
+fail-closed (apart from its existing absent-claim tombstone handling).
+The SQL-only path does not satisfy the production mutation capability gate.
