@@ -112,6 +112,11 @@ inspectThrows = true
 assert(act(businessId, 'unsupported').error == 'invalid_action')
 inspectThrows = false
 assert(CookingJobs.act(42, actor, nil, 'inspect').error == 'invalid_payload')
+assert(CookingJobs.start(42, actor, nil).error == 'invalid_payload')
+assert(CookingJobs.start(42, nil, {}).error == 'invalid_payload')
+assert(CookingJobs.list(42, actor, nil).error == 'invalid_payload')
+assert(CookingJobs.list(42, nil, businessId).error == 'invalid_payload')
+assert(CookingJobs.act(42, nil, { businessId = businessId, jobId = businessId }, 'inspect').error == 'invalid_payload')
 local started = start('request-0001'); assert(started.ok and started.job.state == 'cooking' and started.job.readyAt == 1090)
 local id = started.job.id
 assert(start('request-0001').job.id == id and reserves == 1)
