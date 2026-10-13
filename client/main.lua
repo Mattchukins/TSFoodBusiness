@@ -189,6 +189,7 @@ end)
 local automaticZones = {}
 local refreshingCookingTargets = false
 local cookingRefreshQueued = false
+local cookingRefreshEpoch = 0
 local function clearAutomaticZones()
     for _, zone in ipairs(automaticZones) do
         exports[GetCurrentResourceName()]:RemoveCookingStation(zone)
@@ -199,8 +200,10 @@ refreshCookingTargets = function()
     if refreshingCookingTargets then cookingRefreshQueued = true; return end
     if pendingCount >= 10 or GetResourceState('ox_target') ~= 'started' then return end
     refreshingCookingTargets = true
+    local epoch = cookingRefreshEpoch
     ask('listCookingTargets', {}, function(result)
         refreshingCookingTargets = false
+        if epoch ~= cookingRefreshEpoch then return end
         if cookingRefreshQueued then
             cookingRefreshQueued = false
             SetTimeout(250, refreshCookingTargets)
@@ -254,4 +257,14 @@ AddEventHandler('onResourceStop', function(resource)
     if GetResourceState('ox_target') == 'started' then
         for zone in pairs(targetZones) do exports.ox_target:removeZone(zone) end
     end
+end)
+
+-- A target restart invalidates its old zone IDs; discard local handles and
+-- rebuild only once the provider is running again.
+AddEventHandler('onClientResourceStop', function(resource)
+    if resource ~= 'ox_target' then return end
+    cookingRefreshEpoch = cookingRefreshEpoch + 1
+    automaticZones = {}
+    targetZones = {}
+    cookingRefreshQueued = false
 end)
