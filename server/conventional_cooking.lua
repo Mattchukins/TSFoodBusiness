@@ -195,6 +195,11 @@ function ConventionalCooking.begin(src, actor, data)
         beginning[src] = nil
         return { ok = false, error = 'player_disconnected' }
     end
+    if not dependencies.owner(src, actor, data.businessId)
+        or not dependencies.near(src, actor, data.businessId, data.stationId, plan) then
+        beginning[src] = nil
+        return { ok = false, error = 'forbidden' }
+    end
     local token = ('%d-%d-%d'):format(src, GetGameTimer(), math.random(100000, 999999))
     active[src] = { token = token, actor = actor, data = data, plan = plan,
         deadline = GetGameTimer() + plan.durationSeconds * 1000 }
