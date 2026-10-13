@@ -54,7 +54,8 @@ BEGIN
    FETCH c INTO v_item,v_qty;
    IF v_done THEN LEAVE stock_loop; END IF;
    SET v_seen=v_seen+1;
-   IF v_item IS NULL OR v_item NOT REGEXP '^[a-zA-Z0-9_-]{2,64}
+   IF v_item IS NULL OR NOT (v_item REGEXP '^[a-zA-Z0-9_-]{2,64}$') OR
+      v_qty IS NULL OR v_qty < 1 OR v_qty > 100000 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='invalid_ingredient';
    END IF;
    UPDATE tsfb_ox_stock SET quantity=quantity-v_qty
@@ -92,6 +93,7 @@ BEGIN
  DECLARE v_item VARCHAR(64);
  DECLARE v_qty BIGINT;
  DECLARE v_rev INT;
+ DECLARE v_json_type VARCHAR(20);
  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
  START TRANSACTION;
  SELECT state,owner_id,plan_key,plan_json,revision
@@ -107,7 +109,8 @@ BEGIN
   END IF;
   SET v_item=JSON_UNQUOTE(JSON_EXTRACT(v_plan,'$.outputItem'));
   SET v_qty=CAST(JSON_UNQUOTE(JSON_EXTRACT(v_plan,'$.outputQuantity')) AS UNSIGNED);
-  IF v_item IS NULL OR v_item NOT REGEXP '^[a-zA-Z0-9_-]{2,64}
+  IF v_item IS NULL OR NOT (v_item REGEXP '^[a-zA-Z0-9_-]{2,64}$') OR
+     v_qty IS NULL OR v_qty NOT BETWEEN 1 AND 100000 THEN
    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='invalid_output';
   END IF;
   INSERT INTO tsfb_ox_stock(owner_id,item,quantity)
