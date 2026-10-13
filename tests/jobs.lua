@@ -162,6 +162,12 @@ assert(act(fourth.job.id, 'finish').error == 'job_reconciliation_required' and c
 casFails = false
 assert(act(fourth.job.id, 'finish').ok and commits == 2)
 assert(CookingJobs.list(42, actor, businessId).ok)
+local queryOriginal = MySQL.query.await
+MySQL.query.await = function() error('database unavailable') end
+assert(CookingJobs.list(42, actor, businessId).error == 'database_error')
+MySQL.query.await = function() return nil end
+assert(CookingJobs.list(42, actor, businessId).error == 'database_error')
+MySQL.query.await = queryOriginal
 local savedReadyAt = rows[fourth.job.id].ready_at
 rows[fourth.job.id].ready_at = 'invalid'
 assert(CookingJobs.list(42, actor, businessId).error == 'invalid_saved_job')
