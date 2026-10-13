@@ -2,6 +2,13 @@ local uiOpen = false
 local pending = {}
 local sequence = 0
 local pendingCount = 0
+local refreshCookingTargets
+local refreshActions = {
+    createStation = true, moveStation = true, updateStation = true, deleteStation = true,
+    createRecipe = true, updateRecipe = true, deleteRecipe = true,
+    setProductionProfile = true, deleteProductionProfile = true,
+}
+local refreshRequests = {}
 
 local function closeUi()
     if not uiOpen then return end
@@ -51,17 +58,26 @@ RegisterNUICallback('request', function(data, cb)
     sequence = sequence + 1
     local id = ('%d-%d'):format(GetGameTimer(), sequence)
     pending[id] = cb
+    if refreshActions[data.action] then refreshRequests[id] = true end
     pendingCount = pendingCount + 1
     TriggerServerEvent('tsfb:request', { requestId = id, action = data.action, data = data.payload })
     SetTimeout(10000, function()
-        if pending[id] then pending[id]({ ok = false, error = 'timeout' }); pending[id] = nil; pendingCount = pendingCount - 1 end
+        if pending[id] then pending[id]({ ok = false, error = 'timeout' }); pending[id] = nil; refreshRequests[id] = nil; pendingCount = pendingCount - 1 end
     end)
 end)
 
 RegisterNetEvent('tsfb:response', function(message)
     if type(message) ~= 'table' or type(message.requestId) ~= 'string' then return end
     local cb = pending[message.requestId]
-    if cb then pending[message.requestId] = nil; pendingCount = pendingCount - 1; cb(message.result) end
+    if cb then
+        pending[message.requestId] = nil
+        pendingCount = pendingCount - 1
+        local shouldRefresh = refreshRequests[message.requestId]
+        refreshRequests[message.requestId] = nil
+        cb(message.result)
+        if shouldRefresh and type(message.result) == 'table' and message.result.ok == true
+            and refreshCookingTargets then refreshCookingTargets() end
+    end
 end)
 
 -- Development shell only. No gameplay operation is exposed by this command.
@@ -168,7 +184,7 @@ local function clearAutomaticZones()
     end
     automaticZones = {}
 end
-local function refreshCookingTargets()
+refreshCookingTargets = function()
     if refreshingCookingTargets or pendingCount >= 10 or GetResourceState('ox_target') ~= 'started' then return end
     refreshingCookingTargets = true
     ask('listCookingTargets', {}, function(result)
