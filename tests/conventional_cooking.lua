@@ -27,4 +27,22 @@ assert(ConventionalCooking.produce(1, plan, function() return true end).error ==
 assert(stock.flour == 3 and stock.water == 2)
 assert(ConventionalCooking.produce(1, { outputItem = 'bread', outputQuantity = 0,
  ingredients = plan.ingredients }, function() return true end).error == 'invalid_request')
-print('conventional cooking compensation and authorization tests passed')
+-- Unknown output delivery must not restore ingredients (duplicate-award risk).
+failAward = false
+local originalAdd = Inventory.standardOxAdd
+Inventory.standardOxAdd = function(_, item, quantity)
+ if item == 'bread' then return nil, 'inventory_outcome_unknown' end
+ return originalAdd(_, item, quantity)
+end
+assert(ConventionalCooking.produce(1, plan, function() return true end).error == 'manual_inventory_recovery_required')
+assert(stock.flour == 1 and stock.water == 1)
+Inventory.standardOxAdd = originalAdd
+-- A re-entrant request must not mutate inventory.
+stock.flour, stock.water = 3, 2
+local nested
+assert(ConventionalCooking.produce(1, plan, function()
+ nested = ConventionalCooking.produce(1, plan, function() return true end)
+ return false
+end).error == 'forbidden')
+assert(nested.error == 'cooking_busy' and stock.flour == 3)
+print('conventional cooking compensation, uncertain outcome and locking tests passed')
