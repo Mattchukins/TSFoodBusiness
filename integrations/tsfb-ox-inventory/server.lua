@@ -14,7 +14,8 @@ exports('ItemExists', function(item)
     local ok, result = pcall(function()
         return exports.ox_inventory:Items(item)
     end)
-    return ok and type(result) == 'table'
+    if not ok then return nil end
+    return type(result) == 'table'
 end)
 
 exports('GetItemCount', function(source, item)
