@@ -50,6 +50,29 @@ job.plan_key = FoodBusiness.productionPlanKey(plan)
 job.plan_json = 'invalid'; assert(Inventory.reserve(job) == nil and calls == before)
 job.plan_json = 'plan'; FoodBusiness.Inventory.commitExport = 'invalid/export'
 assert(not Inventory.capabilities().atomicProduction and Inventory.commit(job) == nil)
+-- Even a mistaken operator override cannot enable the stock ox adapter.
+FoodBusiness.Inventory.commitExport = 'CommitProduction'
+FoodBusiness.Inventory.resource = 'tsfb-ox-inventory'
+job.provider_resource = 'tsfb-ox-inventory'
+local oxClaims = { atomicProduction = false, durableEscrow = false,
+    atomicOutput = false, restartReconciliation = false, liveVerified = false }
+exports['tsfb-ox-inventory'] = {
+    ProductionMutationCapabilities = function() return oxClaims end,
+    ReserveProduction = receipt, InspectProductionReservation = receipt,
+    CommitProduction = receipt, ReleaseProduction = receipt,
+}
+assert(not Inventory.capabilities().atomicProduction)
+assert(Inventory.reserve(job) == nil)
+oxClaims.atomicProduction = true
+oxClaims.durableEscrow = true
+oxClaims.atomicOutput = true
+oxClaims.restartReconciliation = true
+assert(not Inventory.capabilities().atomicProduction) -- live verification still required
+oxClaims.liveVerified = true
+assert(Inventory.capabilities().atomicProduction)
+oxClaims.liveVerified = false
+FoodBusiness.Inventory.resource = 'custom_inventory'
+job.provider_resource = 'custom_inventory'
 -- Canonical keys survive JSON integer-to-float decoding.
 local floatPlan = { stationType = 'oven', batches = 2.0, outputItem = 'bread', outputQuantity = 4.0,
     durationSeconds = 90.0, ingredients = { { item = 'flour', quantity = 6.0 } } }
