@@ -71,4 +71,19 @@ if sql "CALL tsfb_stock_reserve('$bad_job','$owner','$key','{\"outputItem\":\"br
 fi
 [[ "$(scalar "SELECT COUNT(*) FROM tsfb_ox_production_receipts WHERE job_id='$bad_job'")" == 0 ]]
 [[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='$owner' AND item='flour'")" == 7 ]]
-echo 'MySQL stock reserve/commit/release/replay/rollback integration tests passed'
+# Competing concurrent reservations must not double-spend the final stock.
+sql "INSERT INTO tsfb_ox_stock(owner_id,item,quantity) VALUES('race-owner','flour',4);"
+race_plan='{"outputItem":"bread","outputQuantity":1,"ingredients":[{"item":"flour","quantity":4}]}'
+race_dir="$(mktemp -d)"
+trap 'rm -rf "$race_dir"; "${mysql_cmd[@]}" -e "DROP DATABASE IF EXISTS tsfb_stock_ci" >/dev/null' EXIT
+(sql "CALL tsfb_stock_reserve('aaaaaaaa-1111-1111-1111-111111111111','race-owner','race-key','$race_plan');" >"$race_dir/a.out" 2>&1 && echo 0 >"$race_dir/a.rc" || echo 1 >"$race_dir/a.rc") &
+pid_a=$!
+(sql "CALL tsfb_stock_reserve('bbbbbbbb-2222-2222-2222-222222222222','race-owner','race-key','$race_plan');" >"$race_dir/b.out" 2>&1 && echo 0 >"$race_dir/b.rc" || echo 1 >"$race_dir/b.rc") &
+pid_b=$!
+wait "$pid_a"
+wait "$pid_b"
+[[ $(( $(cat "$race_dir/a.rc") + $(cat "$race_dir/b.rc") )) == 1 ]]
+[[ "$(scalar "SELECT quantity FROM tsfb_ox_stock WHERE owner_id='race-owner' AND item='flour'")" == 0 ]]
+[[ "$(scalar "SELECT COUNT(*) FROM tsfb_ox_production_receipts WHERE owner_id='race-owner' AND state='reserved'")" == 1 ]]
+[[ "$(scalar "SELECT COALESCE(SUM(quantity),0) FROM tsfb_ox_escrow WHERE job_id IN ('aaaaaaaa-1111-1111-1111-111111111111','bbbbbbbb-2222-2222-2222-222222222222')")" == 4 ]]
+echo 'MySQL stock reserve/commit/release/replay/rollback and concurrency tests passed'
