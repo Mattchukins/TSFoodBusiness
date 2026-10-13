@@ -210,6 +210,9 @@ refreshCookingTargets = function()
         for _, target in ipairs(result.targets) do
             if type(target.x) == 'number' and type(target.y) == 'number'
                 and type(target.z) == 'number'
+                and target.x == target.x and target.y == target.y and target.z == target.z
+                and math.abs(target.x) < 100000 and math.abs(target.y) < 100000
+                and math.abs(target.z) < 100000
                 then
                 local zone = exports[GetCurrentResourceName()]:RegisterCookingStation({
                     businessId = target.businessId, recipeId = target.recipeId,
