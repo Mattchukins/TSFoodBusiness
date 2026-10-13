@@ -140,7 +140,10 @@ function CookingJobs.list(src, actor, businessId)
         return result(nil, 'invalid_payload')
     end
     if not owned(src, actor, businessId) then return result(nil, 'forbidden') end
-    local rows = MySQL.query.await('SELECT * FROM tsfb_cooking_jobs WHERE business_id = ? AND actor_id = ? ORDER BY created_at DESC, id DESC LIMIT 100', { businessId, actor })
+    local queried, rows = pcall(function()
+        return MySQL.query.await('SELECT * FROM tsfb_cooking_jobs WHERE business_id = ? AND actor_id = ? ORDER BY created_at DESC, id DESC LIMIT 100', { businessId, actor })
+    end)
+    if not queried or type(rows) ~= 'table' then return result(nil, 'database_error') end
     local jobs = {}
     for _, row in ipairs(rows) do
         local item = view(row)
