@@ -122,6 +122,22 @@ local function ask(action, data, callback)
         end
     end)
 end
+local cookingErrors = {
+    cooking_busy = 'You are already preparing food',
+    cooking_disabled = 'Cooking is not enabled on this server',
+    insufficient_ingredients = 'You do not have the required ingredients',
+    output_full = 'Not enough inventory space for the prepared food',
+    station_not_near = 'Move closer to the cooking station',
+    forbidden = 'You no longer have permission to use this kitchen',
+    cooking_not_ready = 'Food is still being prepared',
+    cooking_expired = 'Cooking took too long to complete. Please try again',
+    inventory_unavailable = 'Inventory is temporarily unavailable',
+    manual_inventory_recovery_required = 'Inventory needs administrator review',
+    timeout = 'The server did not respond in time',
+}
+local function cookingMessage(error, fallback)
+    return cookingErrors[error] or fallback
+end
 exports('CookRecipe', function(businessId, recipeId, stationId, batches)
     if cooking or pendingCount >= 10 then return false end
     cooking = true
@@ -129,7 +145,7 @@ exports('CookRecipe', function(businessId, recipeId, stationId, batches)
         stationId = stationId, batches = batches or 1 }, function(start)
         if not start or not start.ok then
             cooking = false
-            lib.notify({ type = 'error', description = start and start.error or 'Cooking unavailable' })
+            lib.notify({ type = 'error', description = cookingMessage(start and start.error, 'Cooking unavailable') })
             return
         end
         if type(start.token) ~= 'string' or type(start.durationMs) ~= 'number'
@@ -150,7 +166,7 @@ exports('CookRecipe', function(businessId, recipeId, stationId, batches)
             cooking = false
             if completed then
                 lib.notify({ type = result and result.ok and 'success' or 'error',
-                    description = result and (result.ok and 'Food prepared' or result.error) or 'Cooking failed' })
+                    description = result and (result.ok and 'Food prepared' or cookingMessage(result.error, 'Cooking failed')) or 'Cooking failed' })
             end
         end)
     end)
