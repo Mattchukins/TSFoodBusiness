@@ -6,6 +6,16 @@ exports = { custom_inventory = {
     GetItemCount = function(_, src, item) assert(src == 42 and item == 'flour'); return count end,
 } }
 dofile('bridges/inventory.lua')
+-- The default uses upstream ox_inventory directly for read-only checks.
+exports.ox_inventory = {
+    Items = function(_, item) return item == 'bread' and { name = item } or nil end,
+    GetItemCount = function(_, src, item) assert(src == 42 and item == 'flour'); return count end,
+}
+assert(Inventory.capabilities().configured and not Inventory.capabilities().atomicProduction)
+assert(Inventory.itemExists('bread') == true)
+assert(Inventory.itemExists('missing') == false)
+assert(Inventory.count(42, 'flour') == 4)
+FoodBusiness.Inventory.provider = 'disabled'
 assert(not Inventory.capabilities().configured)
 assert(Inventory.count(42, 'flour') == nil)
 FoodBusiness.Inventory = { provider = 'custom', resource = 'custom_inventory', itemExistsExport = 'ItemExists', countExport = 'GetItemCount' }
