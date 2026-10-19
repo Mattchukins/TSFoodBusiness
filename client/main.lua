@@ -252,6 +252,7 @@ refreshCookingTargets = function()
                 tostring(target.businessId), tostring(target.stationId),
                 tostring(target.recipeId), tostring(target.recipeName),
                 tostring(target.x), tostring(target.y), tostring(target.z),
+                tostring(target.routingBucket),
             }, ':')
         end
         table.sort(signatureParts)
