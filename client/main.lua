@@ -245,6 +245,7 @@ refreshCookingTargets = function()
             SetTimeout(250, refreshCookingTargets)
         end
         if not result or not result.ok or type(result.targets) ~= 'table' then return end
+        if GetResourceState('ox_target') ~= 'started' then return end
         local signatureParts = {}
         for _, target in ipairs(result.targets) do
             signatureParts[#signatureParts + 1] = table.concat({
