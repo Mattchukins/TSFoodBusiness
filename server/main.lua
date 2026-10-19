@@ -137,9 +137,9 @@ local function handleRequest(src, request)
                 JOIN tsfb_recipes r ON r.business_id = b.id
                 JOIN tsfb_production_profiles p ON p.recipe_id = r.id
                     AND p.station_type = s.type
-                WHERE b.owner_id = ?
+                WHERE b.owner_id = ? AND s.routing_bucket = ?
                 ORDER BY b.id, s.id, r.name LIMIT 200
-            ]], { person.id })
+            ]], { person.id, GetPlayerRoutingBucket(src) })
         end)
         respond(src, request.requestId, ok and { ok = true, targets = rows }
             or { ok = false, error = 'database_error' }); return
