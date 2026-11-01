@@ -47,3 +47,13 @@ Schema 7 staff roster is locally implemented with owner-only assignment/edit/rem
 Schema 8 manual staff duty flags compile and pass mocked owner/payload/revision/failure checks. Live SQL installation, duty persistence, audit rollback and membership-delete cascade remain pending. This is not shift or payroll tracking.
 
 Schema 9 self-service duty and shift history require live atomic-write, active-slot concurrency, removal-close/history retention and framework identity-switch tests. Automatic disconnect clock-out remains unimplemented.
+
+
+## November 2026 staff, NUI and packaging gate
+
+- [x] Added a framework-by-framework staff/business acceptance matrix: [STAFF_BUSINESS_LIVE_QA.md](STAFF_BUSINESS_LIVE_QA.md).
+- [x] Added staging installation, release and rollback procedure: [INSTALL_AND_RELEASE.md](INSTALL_AND_RELEASE.md).
+- [x] NUI request helper now bounds stalled requests and rejects malformed responses.
+- [ ] Execute the acceptance matrix on live ESX, QBCore and QBox servers.
+- [ ] Verify the packaged production NUI inside FiveM and real MySQL install/upgrade/rollback.
+- [ ] Publish a release only after the above evidence is recorded.
