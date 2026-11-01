@@ -276,13 +276,15 @@ refreshCookingTargets = function()
                 local key = target.businessId .. ':' .. target.stationId
                 local station = stations[key]
                 if not station then
-                    station = { coords = vector3(target.x, target.y, target.z), options = {} }
+                    station = { coords = vector3(target.x, target.y, target.z), options = {}, recipes = {} }
                     stations[key] = station
                     order[#order + 1] = key
                 end
                 local businessId, stationId, recipeId =
                     target.businessId, target.stationId, target.recipeId
-                station.options[#station.options + 1] = {
+                if not station.recipes[recipeId] then
+                    station.recipes[recipeId] = true
+                    station.options[#station.options + 1] = {
                     name = 'tsfb_cook_' .. stationId .. '_' .. recipeId,
                     icon = 'fa-solid fa-utensils',
                     label = 'Prepare ' .. tostring(target.recipeName or 'food'),
@@ -291,7 +293,8 @@ refreshCookingTargets = function()
                     onSelect = function()
                         exports[GetCurrentResourceName()]:CookRecipe(businessId, recipeId, stationId, 1)
                     end,
-                }
+                    }
+                end
             end
         end
         local registered = 0
