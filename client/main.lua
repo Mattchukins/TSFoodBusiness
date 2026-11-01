@@ -282,12 +282,14 @@ refreshCookingTargets = function()
                 end
                 local businessId, stationId, recipeId =
                     target.businessId, target.stationId, target.recipeId
+                local recipeName = tostring(target.recipeName or 'food')
+                if #recipeName > 100 then recipeName = recipeName:sub(1, 100) end
                 if not station.recipes[recipeId] then
                     station.recipes[recipeId] = true
                     station.options[#station.options + 1] = {
                     name = 'tsfb_cook_' .. stationId .. '_' .. recipeId,
                     icon = 'fa-solid fa-utensils',
-                    label = 'Prepare ' .. tostring(target.recipeName or 'food'),
+                    label = 'Prepare ' .. recipeName,
                     distance = 2.0,
                     canInteract = function() return not cooking and pendingCount < 10 end,
                     onSelect = function()
