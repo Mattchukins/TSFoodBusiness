@@ -194,6 +194,7 @@ exports('RegisterCookingStation', function(config)
             icon = 'fa-solid fa-utensils',
             label = config.label or 'Prepare food',
             distance = 2.0,
+            canInteract = function() return not cooking and pendingCount < 10 end,
             onSelect = function()
                 exports[GetCurrentResourceName()]:CookRecipe(
                     config.businessId, config.recipeId, config.stationId, batches)
@@ -286,6 +287,7 @@ refreshCookingTargets = function()
                     icon = 'fa-solid fa-utensils',
                     label = 'Prepare ' .. tostring(target.recipeName or 'food'),
                     distance = 2.0,
+                    canInteract = function() return not cooking and pendingCount < 10 end,
                     onSelect = function()
                         exports[GetCurrentResourceName()]:CookRecipe(businessId, recipeId, stationId, 1)
                     end,
