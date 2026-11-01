@@ -29,11 +29,24 @@ type Result = CookingResponse & StaffResponse & DutyResponse & { stockReport?: {
 async function request(action: string, payload: Record<string, unknown>): Promise<Result> {
   const name = (window as Window & { GetParentResourceName?: () => string }).GetParentResourceName?.()
   if (!name) return { ok: false, error: 'FiveM resource unavailable' }
-  const response = await fetch(`https://${name}/request`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, payload }),
-  })
-  if (!response.ok) throw new Error('NUI request failed')
-  return response.json()
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 12000)
+  try {
+    const response = await fetch(`https://${name}/request`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, payload }), signal: controller.signal,
+    })
+    if (!response.ok) throw new Error('NUI request failed')
+    const result: unknown = await response.json()
+    if (!result || typeof result !== 'object' || !('ok' in result)
+      || typeof result.ok !== 'boolean') throw new Error('Invalid server response')
+    return result as Result
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('Request timed out. Please retry.')
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
 }
 function App() {
   const [open, setOpen] = useState(false)
