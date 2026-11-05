@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 export type DutyBusiness = { id: string; name: string; role: string; on_duty: number | string; duty_revision: number | string }
 export type DutyResponse = { ok: boolean; error?: string; staffBusinesses?: DutyBusiness[] }
 export function MyDuty({ request, busy, onBusy }: { request: (action: string, payload: Record<string, unknown>) => Promise<DutyResponse>; busy: boolean; onBusy: (value: boolean) => void }) {
@@ -6,6 +6,9 @@ export function MyDuty({ request, busy, onBusy }: { request: (action: string, pa
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [reload, setReload] = useState(0)
   const [message, setMessage] = useState('')
+  const pending = useRef(false)
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useEffect(() => {
     let active = true
     setState('loading'); setMessage('')
@@ -17,14 +20,16 @@ export function MyDuty({ request, busy, onBusy }: { request: (action: string, pa
     return () => { active = false }
   }, [request, reload])
   async function change(business: DutyBusiness) {
-    if (busy || state !== 'ready') return
-    onBusy(true)
+    if (busy || pending.current || state !== 'ready') return
+    pending.current = true
+    onBusy(true); setMessage('')
     try {
       const result = await request('setMyStaffDuty', { businessId: business.id, revision: Number(business.duty_revision), onDuty: Number(business.on_duty) !== 1 })
+      if (!mounted.current) return
       if (!result.ok) { setState('error'); setMessage(result.error === 'staff_conflict' ? 'Duty status changed. Reload before trying again.' : result.error || 'Could not change duty status'); return }
       setReload(value => value + 1)
-    } catch { setState('error'); setMessage('The server did not respond. Reload to verify your saved duty status.') }
-    finally { onBusy(false) }
+    } catch { if (mounted.current) { setState('error'); setMessage('The server did not respond. Reload to verify your saved duty status.') } }
+    finally { pending.current = false; if (mounted.current) onBusy(false) }
   }
   return <section aria-label="My duty status"><p>Start or end your shift at a business where this character is on the staff roster. Confirmed shifts started here close on disconnect during this resource run. After a resource restart or an uncertain save, review and end any shift still shown as open.</p>
     {state === 'loading' && <p role="status">Loading duty status…</p>}
