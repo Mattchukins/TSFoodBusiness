@@ -17,6 +17,10 @@ Repeat each scenario on a disposable ESX, QBCore and QBox test server. Use two c
 | Staff | Owner assigns an online employee | Server resolves actual character ID; role persists; owner cannot assign themselves |
 | Staff | Assign the same employee again | Duplicate denied; one roster row |
 | Staff | Employee tries to edit the roster | Denied, including forged NUI requests |
+| Cooking access | Owner and assigned cook/manager approach an owned kitchen in matching bucket | Their recipe options appear and server authorises cooking when kitchen enabled |
+| Cooking access | Cashier, unrelated player or employee whose role is removed tries to cook | No recipe options; forged begin/finish requests denied; no stock changes |
+| Cooking access | Change character identity or remove cooking permission during preparation | Completion denied; inventory remains unchanged |
+| Cooking access | Disable staff module while kitchen remains enabled in staging | Staff lose access, owner keeps access |
 | Staff | Owner changes a role using current revision | Exactly one update and audit entry; stale revision rejected |
 | Staff | Owner removes employee | Role access immediately revoked; duty and active shift are closed or handled per schema contract |
 | Duty | Employee clocks in and out | Revision increments, active shift opens/closes, history remains |
@@ -33,3 +37,5 @@ Repeat each scenario on a disposable ESX, QBCore and QBox test server. Use two c
 For each framework, record resource versions, server artifact version, SQL schema version, exact steps, expected/actual results, console logs, screenshots, and before/after database rows. Confirm rollback and audit records in MySQL; a green GitHub Actions run alone is insufficient.
 
 Mark each case PASS / FAIL / BLOCKED. **Do not mark staff, business management, or framework compatibility release-ready until all applicable cases pass.**
+
+**Current policy:** Staff duty is a shift-recording feature, not an additional cooking permission gate. Only roles with the `cook` permission can use cooking targets; this must be validated live before enabling the kitchen.

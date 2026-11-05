@@ -1,6 +1,6 @@
 # Feature coverage and evidence
 
-Status checked against `main` commit `502e526` (2026-10-13). This is a source/documentation review, **not** a live FiveM certification. Competitor descriptions are feature benchmarks, never dependencies or assets to copy.
+Source coverage updated 2026-11-05 (live validation remains outstanding). This is a source/documentation review, **not** a live FiveM certification. Competitor descriptions are feature benchmarks, never dependencies or assets to copy.
 
 | Capability | Current implementation evidence | Status | Next acceptance gate |
 | --- | --- | --- | --- |
@@ -9,7 +9,7 @@ Status checked against `main` commit `502e526` (2026-10-13). This is a source/do
 | Visual placement | Station CRUD, position/bucket validation under mocks | Partial; live unverified | Live placement and rollback |
 | Recipes and ingredients | Catalog CRUD, ingredient validation, production profiles | Partial; live unverified | Inventory-backed recipe→output |
 | Cooking jobs | Durable intents, server timing, replay/recovery, React Kitchen | Implemented locally, **disabled by default** | Provider atomicity and live conservation tests |
-| Staff and duty | Roster, role lookup, manual duty, self-service shifts, guarded disconnect close | Partial; local mocked tests | Live identity-switch, reconnect and database tests |
+| Staff and duty | Roster, role lookup, manual duty, self-service shifts, guarded disconnect close; assigned cooks/managers now permitted in conventional cooking while cashiers remain blocked | Partial; source and mocked contracts, live unverified | Live roles, revocation, identity-switch, reconnect and database tests |
 | Supplies | Supplier catalog entries | Partial; purchasing disabled | Purchase/receive/stock reconciliation |
 | Orders and POS | Roadmap only | Not implemented | Paid order→KDS→collection |
 | Internal finance | Roadmap contracts | Not implemented | Idempotent settlement and ledger |

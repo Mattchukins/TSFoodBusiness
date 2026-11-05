@@ -127,22 +127,56 @@ local function handleRequest(src, request)
         if not FoodBusiness.Modules.kitchen or not FoodBusiness.Modules.stations then
             respond(src, request.requestId, { ok = true, targets = {} }); return
         end
-        local ok, rows = pcall(function()
-            return MySQL.query.await([[
-                SELECT s.id AS stationId, s.business_id AS businessId,
-                    r.id AS recipeId, r.name AS recipeName,
-                    s.x, s.y, s.z, s.routing_bucket AS routingBucket
-                FROM tsfb_stations s
-                JOIN tsfb_businesses b ON b.id = s.business_id
-                JOIN tsfb_recipes r ON r.business_id = b.id
-                JOIN tsfb_production_profiles p ON p.recipe_id = r.id
-                    AND p.station_type = s.type
-                WHERE b.owner_id = ? AND s.routing_bucket = ?
-                ORDER BY b.id, s.id, r.name LIMIT 200
-            ]], { person.id, GetPlayerRoutingBucket(src) })
-        end)
-        respond(src, request.requestId, ok and { ok = true, targets = rows }
-            or { ok = false, error = 'database_error' }); return
+        -- Role names are data parameters, never interpolated SQL values.
+        local roles = {}
+        if FoodBusiness.Modules.staff then
+            for role in pairs(FoodBusiness.StaffRoles) do
+                if FoodBusiness.staffRoleAllows(role, 'cook') then roles[#roles + 1] = role end
+            end
+            table.sort(roles)
+        end
+        local placeholders = {}
+        for _ = 1, #roles do placeholders[#placeholders + 1] = '?' end
+        local staffCondition = #roles > 0
+            and (' OR staff.role IN (' .. table.concat(placeholders, ', ') .. ')') or ''
+        local query = [[
+            SELECT s.id AS stationId, s.business_id AS businessId,
+                r.id AS recipeId, r.name AS recipeName,
+                s.x, s.y, s.z, s.routing_bucket AS routingBucket,
+                b.owner_id AS ownerId, staff.member_id AS staffMemberId,
+                staff.role AS staffRole
+            FROM tsfb_stations s
+            JOIN tsfb_businesses b ON b.id = s.business_id
+            JOIN tsfb_recipes r ON r.business_id = b.id
+            JOIN tsfb_production_profiles p ON p.recipe_id = r.id
+                AND p.station_type = s.type
+            LEFT JOIN tsfb_staff staff ON staff.business_id = b.id
+                AND staff.member_id = ?
+            WHERE s.routing_bucket = ? AND (b.owner_id = ?]] .. staffCondition .. [[)
+            ORDER BY b.id, s.id, r.name LIMIT 200
+        ]]
+        local parameters = { person.id, GetPlayerRoutingBucket(src), person.id }
+        for _, role in ipairs(roles) do parameters[#parameters + 1] = role end
+        local ok, rows = pcall(function() return MySQL.query.await(query, parameters) end)
+        if not ok or type(rows) ~= 'table' then
+            respond(src, request.requestId, { ok = false, error = 'database_error' }); return
+        end
+        local current = Framework.player(src)
+        if not current or current.id ~= person.id then
+            respond(src, request.requestId, { ok = false, error = 'identity_unavailable' }); return
+        end
+        local targets = {}
+        for _, row in ipairs(rows) do
+            if CookingAccess.targetAllowed(person.id, row) then
+                targets[#targets + 1] = {
+                    stationId = row.stationId, businessId = row.businessId,
+                    recipeId = row.recipeId, recipeName = row.recipeName,
+                    x = row.x, y = row.y, z = row.z,
+                    routingBucket = row.routingBucket,
+                }
+            end
+        end
+        respond(src, request.requestId, { ok = true, targets = targets }); return
     end
     if request.action == 'listBusinesses' then
         if next(request.data) ~= nil then
@@ -578,25 +612,61 @@ exports('IsOwnerNearStation', function(src, businessId, stationId, radius)
 end)
 
 -- Read-only integration: recompute on cook start; never treat a plan as a reservation.
-local function getOwnerProductionPlan(src, businessId, recipeId, stationId, batches)
+local function getProductionPlan(src, businessId, recipeId, stationId, batches, allowCookingStaff)
     if not ready or not FoodBusiness.Modules.recipes or not FoodBusiness.Modules.stations
         or not validInteger(src, 1, 2147483647) or not validId(businessId)
-        or not validId(recipeId) or not validId(stationId) or not validInteger(batches, 1, 100) then return nil end
+        or not validId(recipeId) or not validId(stationId)
+        or not validInteger(batches, 1, 100) then return nil end
     local ok, plan = pcall(function()
         local person = Framework.player(src)
         if not person or not validText(person.id, 80) then return nil end
-        local business = MySQL.single.await('SELECT id FROM tsfb_businesses WHERE id = ? AND owner_id = ?', { businessId, person.id })
-        if not business then return nil end
-        local recipe = MySQL.single.await('SELECT ingredients FROM tsfb_recipes WHERE id = ? AND business_id = ?', { recipeId, businessId })
-        local station = MySQL.single.await('SELECT type FROM tsfb_stations WHERE id = ? AND business_id = ?', { stationId, businessId })
-        local profile = MySQL.single.await('SELECT station_type, output_item, output_quantity, duration_seconds FROM tsfb_production_profiles WHERE recipe_id = ?', { recipeId })
+        if allowCookingStaff then
+            if not CookingAccess.allowed(src, person.id, businessId) then return nil end
+        else
+            local business = MySQL.single.await(
+                'SELECT id FROM tsfb_businesses WHERE id = ? AND owner_id = ?',
+                { businessId, person.id })
+            if not business then return nil end
+        end
+        local recipe = MySQL.single.await(
+            'SELECT ingredients FROM tsfb_recipes WHERE id = ? AND business_id = ?',
+            { recipeId, businessId })
+        local station = MySQL.single.await(
+            'SELECT type FROM tsfb_stations WHERE id = ? AND business_id = ?',
+            { stationId, businessId })
+        local profile = MySQL.single.await(
+            'SELECT station_type, output_item, output_quantity, duration_seconds FROM tsfb_production_profiles WHERE recipe_id = ?',
+            { recipeId })
         if not recipe or not station or not profile then return nil end
         local ingredients = json.decode(recipe.ingredients)
-        return FoodBusiness.planProduction(ingredients, { stationType = profile.station_type, outputItem = profile.output_item,
-            outputQuantity = tonumber(profile.output_quantity), durationSeconds = tonumber(profile.duration_seconds) }, station.type, batches)
+        local computed = FoodBusiness.planProduction(ingredients, {
+            stationType = profile.station_type, outputItem = profile.output_item,
+            outputQuantity = tonumber(profile.output_quantity),
+            durationSeconds = tonumber(profile.duration_seconds),
+        }, station.type, batches)
+        if not computed then return nil end
+        -- The identity and permission may have changed during SQL awaits.
+        local current = Framework.player(src)
+        if not current or current.id ~= person.id then return nil end
+        if allowCookingStaff then
+            if not CookingAccess.allowed(src, person.id, businessId) then return nil end
+        else
+            local owner = MySQL.single.await(
+                'SELECT id FROM tsfb_businesses WHERE id = ? AND owner_id = ?',
+                { businessId, person.id })
+            current = Framework.player(src)
+            if not owner or not current or current.id ~= person.id then return nil end
+        end
+        return computed
     end)
     if not ok then return nil end
     return plan
+end
+local function getOwnerProductionPlan(src, businessId, recipeId, stationId, batches)
+    return getProductionPlan(src, businessId, recipeId, stationId, batches, false)
+end
+local function getCookingProductionPlan(src, businessId, recipeId, stationId, batches)
+    return getProductionPlan(src, businessId, recipeId, stationId, batches, true)
 end
 exports('GetOwnerProductionPlan', getOwnerProductionPlan)
 exports('GetInventoryCapabilities', function() return Inventory.capabilities() end)
@@ -656,7 +726,15 @@ if CookingJobs then
         end,
     }
     CookingJobs.configure(cookingDependencies)
-    if ConventionalCooking then ConventionalCooking.configure(cookingDependencies) end
+    if ConventionalCooking then
+        ConventionalCooking.configure({
+            plan = getCookingProductionPlan,
+            owner = function(src, actor, businessId)
+                return ready and CookingAccess.allowed(src, actor, businessId)
+            end,
+            near = cookingDependencies.near,
+        })
+    end
 end
 
 exports('GetBusinessStaffRole', function(src, businessId)
