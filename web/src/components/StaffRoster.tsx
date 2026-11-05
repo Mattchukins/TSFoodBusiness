@@ -28,6 +28,7 @@ export function StaffRoster({ businessId, request, busy, onBusy }: {
   const [search, setSearch] = useState('')
   const [message, setMessage] = useState('')
   const mounted = useRef(true)
+  const pending = useRef(false)
   useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   useEffect(() => {
     let active = true
@@ -41,7 +42,8 @@ export function StaffRoster({ businessId, request, busy, onBusy }: {
   }, [businessId, reload, request])
   function reset() { setEditing(null); setSource(''); setName(''); setRole('') }
   async function mutate(action: string, payload: Record<string, unknown>) {
-    if (busy || state !== 'ready') return
+    if (busy || pending.current || state !== 'ready') return
+    pending.current = true
     onBusy(true); setMessage('')
     try {
       const result = await request(action, { businessId, ...payload })
@@ -60,7 +62,7 @@ export function StaffRoster({ businessId, request, busy, onBusy }: {
       if (!history.ok) throw new Error('Shift refresh failed')
       setShifts(history.shifts || []); setMembers(saved.staff || []); setState('ready')
     } catch { if (mounted.current) { setState('error'); setMessage('The server did not respond. Reload the roster to verify whether the change completed.') } }
-    finally { onBusy(false) }
+    finally { pending.current = false; if (mounted.current) onBusy(false) }
   }
   function save(event: React.FormEvent) {
     event.preventDefault()
