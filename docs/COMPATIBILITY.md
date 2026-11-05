@@ -1,14 +1,14 @@
 # Compatibility and verification status
 
-As of 2026-09-28, this repository contains development source and a locally passing TypeScript/Vite build. No live FiveM server result is recorded.
+As of 2026-11-05, separate server-side ESX/QBCore/QBox adapter files have mocked contract tests in CI. No live FiveM server result is recorded.
 
 | Component | Code present | Live verified | Status |
 | --- | --- | --- | --- |
 | FiveM resource manifest and Lua lifecycle | Yes | No | Requires build assets and server smoke test |
 | React/TypeScript NUI close/request bridge | Yes | No | Browser build passed, FiveM interaction pending |
-| ESX identity adapter | Yes | No | v0.1 target; independently test |
-| QBCore identity adapter | Yes | No | v0.1 target; independently test |
-| QBox identity adapter | Yes | No | v0.1 target; independently test |
+| ESX identity adapter | Yes, isolated adapter and mocked tests | No | Run actual FiveM framework smoke test |
+| QBCore identity adapter | Yes, isolated adapter and mocked tests | No | Run actual FiveM framework smoke test |
+| QBox identity adapter | Yes, isolated adapter and mocked tests | No | Run actual FiveM framework smoke test |
 | oxmysql/manual schema gate | Yes | No | Apply both SQL scripts; automated migration upgrades not implemented |
 | ox_lib dependency | Declared | No | UI helpers not yet used |
 | Inventory / target | No | No | Planned optional adapters |

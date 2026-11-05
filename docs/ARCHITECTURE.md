@@ -2,7 +2,7 @@
 
 ## Current implementation
 
-`fxmanifest.lua` loads oxmysql, ox_lib, shared configuration, framework selection, a server schema gate and a Lua client NUI bridge. The development `/foodbusiness_ui` command opens the React shell. The `close` and `request` callbacks check payloads; the allowlist covers business, recipe and supplier catalog actions, a read-only recipe price quote, owner-only operating profiles and persistent station placements. The server derives character identity; creation checks ACE permission, and mutations write an audit row in one local transaction. `sql/install.sql` is imported manually for installation/additive upgrade; `sql/uninstall.sql` is the separate destructive removal script. Startup refuses business requests if the schema check fails. These source paths have not been live verified.
+`fxmanifest.lua` loads oxmysql, ox_lib, shared configuration, independent ESX/QBCore/QBox adapter definitions and framework selection, a server schema gate and a Lua client NUI bridge. The development `/foodbusiness_ui` command opens the React shell. The `close` and `request` callbacks check payloads; the allowlist covers business, recipe and supplier catalog actions, a read-only recipe price quote, owner-only operating profiles and persistent station placements. The server derives character identity; creation checks ACE permission, and mutations write an audit row in one local transaction. `sql/install.sql` is imported manually for installation/additive upgrade; `sql/uninstall.sql` is the separate destructive removal script. Startup refuses business requests if the schema check fails. These source paths have not been live verified.
 
 ## Service ownership
 
@@ -34,3 +34,8 @@ Untrusted NUI/client input, forged business IDs, replayed payment requests, dupl
 Production profiles are owner-scoped via a recipe/business lookup. `getProductionProfile` returns one configuration or no profile; `setProductionProfile` accepts only businessId, recipeId and a validated profile, upserts by recipe_id and writes recipe.production audit in the same SQL transaction. This provides configuration, not inventory availability or cook authorization.
 
 GetOwnerProductionPlan is a server-only read integration. It resolves the server identity, verifies business ownership, scopes recipe/station reads to that business and plans against persisted production settings. It returns no plan on missing/invalid/incompatible data or database errors; it does not reserve inventory or authorize cooking.
+
+
+## Framework adapter isolation (November 2026)
+
+`bridges/esx.lua`, `bridges/qbcore.lua` and `bridges/qbox.lua` implement separate server-side identity/job/grade readers. `bridges/framework.lua` selects one primary adapter at startup, ignores QBox's `qb-core` compatibility alias when counting primary frameworks, and rejects missing, ambiguous or failed initializations. Framework lookups fail closed if a character becomes unavailable or a provider throws. The mocked adapter tests are not live FiveM compatibility certification. Money, jobs administration and billing are still outside these identity adapters.

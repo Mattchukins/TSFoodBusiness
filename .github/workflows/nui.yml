@@ -10,6 +10,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: sudo apt-get update && sudo apt-get install -y lua5.4
       - run: lua5.4 tests/syntax.lua
+      - run: lua5.4 tests/framework.lua
       - run: lua5.4 tests/operations.lua
       - run: lua5.4 tests/presets.lua
       - run: lua5.4 tests/business_creation.lua
